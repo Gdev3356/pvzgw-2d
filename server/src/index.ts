@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import { startRoom } from './room';
 
 const PORT = Number(process.env.PORT) || 3001;
+const HOST = process.env.HOST || '127.0.0.1'; // Nginx proxies to this from outside; nothing else needs to reach it directly
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 
 const httpServer = createServer((req, res) => {
@@ -25,6 +26,6 @@ const io = new Server(httpServer, {
 
 startRoom(io);
 
-httpServer.listen(PORT, () => {
-    console.log(`[server] listening on http://localhost:${PORT} (accepting clients from ${CLIENT_ORIGIN})`);
+httpServer.listen(PORT, HOST, () => {
+    console.log(`[server] listening on http://${HOST}:${PORT} (accepting clients from ${CLIENT_ORIGIN})`);
 });

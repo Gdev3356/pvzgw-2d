@@ -101,6 +101,13 @@ export function startRoom(io: Server): void {
     let tick = 0;
 
     setInterval(() => {
+        // Nobody connected — skip the whole tick. The interval itself keeps
+        // firing at TICK_RATE so the room resumes instantly on the next
+        // 'join', but doing nothing 30x/sec costs next to nothing, versus
+        // running the full simulation (collisions, projectile/explosion
+        // updates, snapshot build, io.emit) against empty state forever.
+        if (players.size === 0) return;
+
         const now = Date.now();
         const dt60 = 60 / TICK_RATE;
         const deltaMs = 1000 / TICK_RATE;
