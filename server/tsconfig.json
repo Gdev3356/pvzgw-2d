@@ -1,0 +1,21 @@
+{
+    "compilerOptions": {
+        "target": "ES2020",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "lib": ["ES2020", "DOM"],
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "rootDir": "..",
+        "outDir": "dist",
+        "resolveJsonModule": true
+    },
+    // rootDir is the repo root (one level up from server/) because this
+    // project pulls in shared/src as well as its own src/. tsc mirrors that
+    // relative layout under outDir, so a `build` lands the entry point at
+    // dist/server/src/index.js, not dist/index.js — that's why "start" runs
+    // src/index.ts directly through tsx instead of relying on a dist path;
+    // use `npm run build` only if you specifically want a compiled artifact.
+    "include": ["src/**/*.ts", "../shared/src/**/*.ts"]
+}

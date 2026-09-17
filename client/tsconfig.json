@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    /* JSX Support */
+    "jsx": "react-jsx",
+
+    /* Bundler resolution */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Resolve @shared/* to the sibling shared/src folder, matching the
+       alias in vite.config.ts. TS resolves "paths" relative to this file
+       directly now, so no "baseUrl" needed (it's deprecated as of TS 6). */
+    "paths": {
+      "@shared/*": ["../shared/src/*"]
+    },
+
+    /* Strict Type-Checking Options */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"]
+}

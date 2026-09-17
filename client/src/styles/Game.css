@@ -1,0 +1,239 @@
+@font-face {
+    font-family: 'Samdan';
+    src: url('../assets/UI/Fonts/Samdan.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Samdan Condensed';
+    src: url('../assets/UI/Fonts/SamdanCondensed.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Samdan Evil';
+    src: url('../assets/UI/Fonts/SamdanEvil.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Samdan Evil Condensed';
+    src: url('../assets/UI/Fonts/SamdanEvilCondensed.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+    font-display: swap;
+}
+
+.game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    height: 100vh;
+    width: 100vw;
+    background-color: #121212;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #ffffff;
+    user-select: none;
+    overflow: hidden;
+}
+
+.game-header {
+    flex: 0 0 auto;
+    margin-bottom: 0;
+    padding: 12px 0;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    z-index: 2;
+}
+
+.game-title {
+    margin: 0;
+    font-size: 28px;
+    font-family: 'Samdan', 'Segoe UI', sans-serif;
+    letter-spacing: 0.5px;
+    color: #8BC34A;
+    text-transform: uppercase;
+    -webkit-text-stroke: 1.5px #1B5E20;
+    paint-order: stroke fill;
+}
+
+.class-selector {
+    display: flex;
+    gap: 10px;
+}
+
+.class-btn {
+    background: #2a2a2a;
+    color: #aaaaaa;
+    border: 1px solid #444444;
+    padding: 10px 22px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 19px;
+    font-family: 'Samdan Condensed', 'Segoe UI', sans-serif;
+    letter-spacing: 0.3px;
+    transition: all 0.15s ease-in-out;
+    -webkit-text-stroke: 1.25px #000000;
+    paint-order: stroke fill;
+}
+
+.class-btn:hover {
+    background: #333333;
+    color: #ffffff;
+}
+
+.class-btn.active-plant {
+    background: #388E3C;
+    color: #ffffff;
+    border-color: #4CAF50;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.4);
+}
+
+.class-btn.active-zombie {
+    font-family: 'Samdan Evil Condensed', 'Segoe UI', sans-serif;
+    background: #7B1FA2;
+    color: #ffffff;
+    border-color: #9C27B0;
+    box-shadow: 0 0 8px rgba(156, 39, 176, 0.4);
+}
+
+.viewport-wrapper {
+    position: relative;
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.game-viewport {
+    background-color: #f4f6f0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+}
+
+.hud-container {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+    right: 16px;
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+}
+
+.hud-card {
+    background: rgba(0, 0, 0, 0.75);
+    padding: 12px 20px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(4px);
+    display: flex;
+    flex-direction: column;
+    min-width: 180px;
+}
+
+.hud-label {
+    font-size: 16px;
+    font-weight: 700;
+    font-family: 'Samdan Condensed', 'Segoe UI', sans-serif;
+    color: #aaaaaa;
+    letter-spacing: 0.5px;
+    -webkit-text-stroke: 1px #000000;
+    paint-order: stroke fill;
+}
+
+.hud-value {
+    font-size: 24px;
+    font-weight: bold;
+    font-family: 'Samdan Condensed', 'Segoe UI', sans-serif;
+    margin-top: 4px;
+    -webkit-text-stroke: 1.25px #000000;
+    paint-order: stroke fill;
+}
+
+.health-bar-bg {
+    width: 160px;
+    height: 12px;
+    background-color: #333333;
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 5px;
+}
+
+.health-bar-fill {
+    height: 100%;
+    background-color: #4CAF50;
+    transition: width 0.1s ease-out;
+}
+
+.abilities-bar {
+    display: flex;
+    gap: 14px;
+    pointer-events: none;
+}
+
+.ability-box {
+    position: relative;
+    width: 76px;
+    height: 76px;
+    background: rgba(20, 20, 20, 0.85);
+    border: 2px solid #555555;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+}
+
+.ability-key {
+    position: absolute;
+    top: 5px;
+    left: 7px;
+    font-size: 16px;
+    font-weight: 900;
+    font-family: 'Samdan Condensed', 'Segoe UI', sans-serif;
+    color: #FFC107;
+    -webkit-text-stroke: 1.25px #6D4C00;
+    paint-order: stroke fill;
+}
+
+.ability-name {
+    font-size: 14px;
+    font-weight: bold;
+    font-family: 'Samdan Condensed', 'Segoe UI', sans-serif;
+    color: #ffffff;
+    text-align: center;
+    margin-top: 12px;
+    padding: 0 5px;
+    -webkit-text-stroke: 1px #000000;
+    paint-order: stroke fill;
+}
+
+.cooldown-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: bold;
+    font-family: 'Samdan Condensed', 'Segoe UI', sans-serif;
+    color: #FF5252;
+    -webkit-text-stroke: 1.25px #7A1F1F;
+    paint-order: stroke fill;
+}
