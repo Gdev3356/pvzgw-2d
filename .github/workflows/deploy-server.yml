@@ -1,0 +1,35 @@
+name: Deploy server
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'shared/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.ORACLE_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.ORACLE_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Sync server + shared only
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }} "mkdir -p ~/pvzgw-2d"
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key" \
+            --exclude 'node_modules' --exclude 'dist' \
+            server shared \
+            ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }}:~/pvzgw-2d/
+
+      - name: Install + restart
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }} \
+            "chmod +x ~/pvzgw-2d/server/deploy.sh && ~/pvzgw-2d/server/deploy.sh"
