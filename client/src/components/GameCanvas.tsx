@@ -103,6 +103,25 @@ import peaGatlingRight3Src from '../assets/Peashooter/Sprites/Abilities/PeaGatli
 import peaGatlingRight4Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_right_4.png';
 import peaGatlingRightFiringSrc from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_right_firing.png';
 
+// Pea Gatling — SE view (reused mirrored for SW, same idea as NE/E above).
+// NOTE: unlike the Up and NE sets, none of the five base southeast frames
+// have been confirmed as an exact duplicate of another — all five are
+// included below. If one turns out to be a dupe like pea_gatling_up_1.png
+// or pea_gatling_northeast_2.png were, drop it from the gatlingDiagonalDown
+// array the same way those were dropped.
+import peaGatlingActivationSESrc from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_activation_southeast.png';
+import peaGatlingActivationSE1Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_activation_southeast_1.png';
+import peaGatlingActivationSE2Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_activation_southeast_2.png';
+import peaGatlingActivationSE3Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_activation_southeast_3.png';
+import peaGatlingActivationSE4Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_activation_southeast_4.png';
+import peaGatlingActivationSE5Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_activation_southeast_5.png';
+import peaGatlingSESrc from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_southeast.png';
+import peaGatlingSE1Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_southeast_1.png';
+import peaGatlingSE2Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_southeast_2.png';
+import peaGatlingSE3Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_southeast_3.png';
+import peaGatlingSE4Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_southeast_4.png';
+import peaGatlingSEFiringSrc from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_southeast_firing.png';
+
 import peaSpriteSrc from '../assets/Peashooter/Sprites/pea.png';
 import peaFired1Src from '../assets/Peashooter/Sprites/pea_fired_1.png';
 import peaFired2Src from '../assets/Peashooter/Sprites/pea_fired_2.png';
@@ -448,6 +467,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
             ]),
             gatlingSide: loadImages([peaGatlingRightSrc, peaGatlingRight2Src, peaGatlingRight3Src, peaGatlingRight4Src]),
             gatlingFiringSide: loadImages([peaGatlingRightFiringSrc]),
+
+            gatlingActivationDiagonalDown: loadImages([
+                peaGatlingActivationSESrc, peaGatlingActivationSE1Src, peaGatlingActivationSE2Src,
+                peaGatlingActivationSE3Src, peaGatlingActivationSE4Src, peaGatlingActivationSE5Src,
+            ]),
+            gatlingDiagonalDown: loadImages([peaGatlingSESrc, peaGatlingSE1Src, peaGatlingSE2Src, peaGatlingSE3Src, peaGatlingSE4Src]),
+            gatlingFiringDiagonalDown: loadImages([peaGatlingSEFiringSrc]),
         };
     }, []);
 

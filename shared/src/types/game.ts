@@ -208,6 +208,9 @@ export interface CharacterSprites {
     gatlingActivationSide?: HTMLImageElement[];     // E/W variant of gatlingActivationUp
     gatlingSide?: HTMLImageElement[];               // E/W variant of gatlingUp
     gatlingFiringSide?: HTMLImageElement[];         // E/W variant of gatlingFiringUp
+    gatlingActivationDiagonalDown?: HTMLImageElement[]; // SE/SW variant of gatlingActivationUp
+    gatlingDiagonalDown?: HTMLImageElement[];           // SE/SW variant of gatlingUp
+    gatlingFiringDiagonalDown?: HTMLImageElement[];     // SE/SW variant of gatlingFiringUp
 }
 
 // A sound the simulation wants played, reported rather than played directly —

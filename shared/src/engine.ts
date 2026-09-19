@@ -27,7 +27,7 @@ export const CLASS_CONFIGS: Record<CharacterClass, ClassConfig> = {
         weapon: {
             name: 'Pea Cannon',
             maxAmmo: 10,
-            fireRate: 320,
+            fireRate: 350,
             reloadDuration: 1500,
             projectileSpeed: 10,
             directDamage: 25,
@@ -1080,38 +1080,43 @@ export class Player {
         }
 
         // Pea Gatling stance (and its exit transition) overrides whatever the
-        // regular directional selection above came up with. NE/NW and E/W
-        // now have their own art (see pickFacingOrUp below); only S still
-        // falls back to the "up" view with the same rotation trick used
-        // elsewhere for missing side/down sprites, rather than leaving it
-        // undrawn.
+        // regular directional selection above came up with. NE/NW, E/W, and
+        // now SE/SW all have their own art (see pickFacingOrUp below); only
+        // N and S still fall back to the "up" view — S via the same rotation
+        // trick used elsewhere for missing side/down sprites, rather than
+        // leaving it undrawn.
         if ((this.isGatlingMode || this.isGatlingDeactivating) && sprites && !Array.isArray(sprites)) {
             const dict = sprites as Record<string, HTMLImageElement[] | undefined>;
 
-            // NE/NW and E/W each have their own gatling art now. Mirrors the
-            // regular walk/shoot dispatch above, which reuses a single
-            // "diagonal" set for both NE and NW, and a single "side" set for
-            // both E and W — the horizontal flip for NW/W comes for free
-            // from the shared ctx.scale(dirInfo.scaleX, ...) call at the end
-            // of draw(), so one asset set covers each mirrored pair.
+            // NE/NW, E/W, and SE/SW each have their own gatling art now.
+            // Mirrors the regular walk/shoot dispatch above, which reuses a
+            // single "diagonal" set for both NE and NW, a single "side" set
+            // for both E and W, and a single "diagonalDown" set for both SE
+            // and SW — the horizontal flip for NW/W/SW comes for free from
+            // the shared ctx.scale(dirInfo.scaleX, ...) call at the end of
+            // draw(), so one asset set covers each mirrored pair.
             const isDiagonalFacing = dirInfo.direction === 'NE' || dirInfo.direction === 'NW';
             const isSideFacing = dirInfo.direction === 'E' || dirInfo.direction === 'W';
+            const isDiagonalDownFacing = dirInfo.direction === 'SE' || dirInfo.direction === 'SW';
             const pickFacingOrUp = (facingKey: string, upKey: string): HTMLImageElement[] | undefined => {
-                if (isDiagonalFacing || isSideFacing) {
+                if (isDiagonalFacing || isSideFacing || isDiagonalDownFacing) {
                     const facingSet = dict[facingKey];
                     if (facingSet && facingSet.length > 0) return facingSet;
                 }
                 return dict[upKey];
             };
 
-            const gatlingIdle = pickFacingOrUp(isSideFacing ? 'gatlingSide' : 'gatlingDiagonal', 'gatlingUp');
-            const gatlingFiring = pickFacingOrUp(isSideFacing ? 'gatlingFiringSide' : 'gatlingFiringDiagonal', 'gatlingFiringUp');
-            const gatlingActivation = pickFacingOrUp(isSideFacing ? 'gatlingActivationSide' : 'gatlingActivationDiagonal', 'gatlingActivationUp');
+            const gatlingFacingKey = (side: string, diagonal: string, diagonalDown: string): string =>
+                isSideFacing ? side : isDiagonalDownFacing ? diagonalDown : diagonal;
+
+            const gatlingIdle = pickFacingOrUp(gatlingFacingKey('gatlingSide', 'gatlingDiagonal', 'gatlingDiagonalDown'), 'gatlingUp');
+            const gatlingFiring = pickFacingOrUp(gatlingFacingKey('gatlingFiringSide', 'gatlingFiringDiagonal', 'gatlingFiringDiagonalDown'), 'gatlingFiringUp');
+            const gatlingActivation = pickFacingOrUp(gatlingFacingKey('gatlingActivationSide', 'gatlingActivationDiagonal', 'gatlingActivationDiagonalDown'), 'gatlingActivationUp');
 
             // Only relevant for the one facing still standing in on the "up"
-            // art (S) — NE/NW and E/W have real art now (same as they always
-            // did for walk/shoot), so neither pair goes through this
-            // rotation trick anymore.
+            // art (S) — NE/NW, E/W, and SE/SW have real art now (same as
+            // they always did for walk/shoot), so none of those three pairs
+            // goes through this rotation trick anymore.
             needsFallbackRotation = dirInfo.direction === 'S';
 
             const ACTIVATION_TICKS_PER_FRAME = 4;
