@@ -11,7 +11,7 @@ module.exports = {
                 HOST: '127.0.0.1',
                 // Update this if your client ends up on the apex domain
                 // instead of *.vercel.app — see the note below.
-                CLIENT_ORIGIN: 'https://pvzgw2d.com.br',
+                CLIENT_ORIGIN: 'https://www.pvzgw2d.com.br',
             },
         },
     ],
