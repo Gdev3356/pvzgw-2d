@@ -10,15 +10,15 @@ pvzgw-2d/
 └── shared/    Game logic + types used by BOTH — deployed with neither on its own
 ```
 
-## Why a `shared/` folder, not two copies
+## What is the `shared/` folder?
 
 `engine.ts` (Player/TargetDummy classes) and `simulation.ts` (the tick-by-tick
 projectile/chili-bean/collision stepping) are DOM-free on purpose — the
 comments in your own code already call this out (`Runs identically on the
 server tick loop; never touches canvas/Audio/Image`). That's what makes
 client-side prediction and the server's authoritative simulation stay in
-sync: they're *the same code*, not two hand-kept-in-sync copies. If you
-duplicated these files into `client/` and `server/` separately, every future
+sync: they're *the same code*, not two hand-kept-in-sync copies. If they were
+duplicated, the files from `client/` and `server/` separately, every future
 gameplay tweak would need to be made twice and would eventually drift and
 cause client/server mispredictions. So `shared/` holds:
 
@@ -44,7 +44,7 @@ next to whichever half you're building.
   alias would need extra runtime wiring `tsx` doesn't need.
 
 Neither folder imports anything from the other's `package.json` or `src/`.
-`shared/` has no `package.json` of its own — it's just TypeScript source both
+`shared/` has no `package.json` of its own, it's just TypeScript source both
 sides compile fresh.
 
 ## Deploying
@@ -77,22 +77,11 @@ sides compile fresh.
   the shared type file — backwards, and awkward once the server needed it
   too. It's now defined directly in `shared/src/types/network.ts`.
 - `NetworkedPlayerState` was missing an `isDead` field that `server/src/room.ts`
-  was already sending in every snapshot. Added it — this was a latent type
-  error your server's `tsc` would have flagged the first time anyone ran it
+  was already sending in every snapshot. Added it, this was a latent type
+  error from server's `tsc` would have flagged the first time anyone ran it
   instead of just executing through `tsx`.
 - `client/src/utils/network.ts` no longer declares `NetworkedDummy`/
   `ClientSwitchClassMessage` — they weren't referenced anywhere in the client
   and duplicated what's now in `shared/`.
 - The old root `tsconfig.json`'s `"include": ["src", "server/src/room.ts"]`
   is gone — each project now type-checks only its own files.
-
-Everything else — game balance, sprites, sounds, network protocol, the actual
-simulation — is byte-for-byte what you already had.
-
-## One thing you still need to do
-
-The actual binary assets (`src/assets/` — sprites, `.wav` files, fonts)
-weren't part of what you sent me, so `client/src/assets/` currently only has
-a placeholder note. Copy your real `assets/` folder in there before running
-`npm run dev` / `npm run build` in `client/`.
-# pvzgw-2d
