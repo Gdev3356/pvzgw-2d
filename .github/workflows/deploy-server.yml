@@ -13,13 +13,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up SSH
+            - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.ORACLE_SSH_KEY }}" > ~/.ssh/deploy_key
+          echo "${{ secrets.ORACLE_SSH_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.ORACLE_HOST }} >> ~/.ssh/known_hosts
 
+      - name: Verify key is actually valid before trying to use it
+        run: |
+          ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null \
+            && echo "Key parses correctly." \
+            || (echo "::error::Deploy key failed to parse — check for corruption in the ORACLE_SSH_KEY secret" && exit 1)
+      
       - name: Sync server + shared only
         run: |
           ssh -i ~/.ssh/deploy_key ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }} "mkdir -p ~/pvzgw-2d"
