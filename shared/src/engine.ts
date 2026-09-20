@@ -1082,44 +1082,48 @@ export class Player {
         }
 
         // Pea Gatling stance (and its exit transition) overrides whatever the
-        // regular directional selection above came up with. NE/NW, E/W, and
-        // now SE/SW all have their own art (see pickFacingOrUp below); only
-        // N and S still fall back to the "up" view — S via the same rotation
-        // trick used elsewhere for missing side/down sprites, rather than
-        // leaving it undrawn.
+        // regular directional selection above came up with. NE/NW, E/W,
+        // SE/SW, and now S all have their own art (see pickFacingOrUp
+        // below); only N still stands in for another facing — which is
+        // trivially true, since N *is* the "up" view.
         if ((this.isGatlingMode || this.isGatlingDeactivating) && sprites && !Array.isArray(sprites)) {
             const dict = sprites as Record<string, HTMLImageElement[] | undefined>;
 
-            // NE/NW, E/W, and SE/SW each have their own gatling art now.
+            // NE/NW, E/W, SE/SW, and S each have their own gatling art now.
             // Mirrors the regular walk/shoot dispatch above, which reuses a
             // single "diagonal" set for both NE and NW, a single "side" set
             // for both E and W, and a single "diagonalDown" set for both SE
             // and SW — the horizontal flip for NW/W/SW comes for free from
             // the shared ctx.scale(dirInfo.scaleX, ...) call at the end of
-            // draw(), so one asset set covers each mirrored pair.
+            // draw(), so one asset set covers each mirrored pair. S has no
+            // mirrored counterpart to share with (same as N/"up" itself), so
+            // it gets its own ungrouped set rather than a "side"-style pair.
             const isDiagonalFacing = dirInfo.direction === 'NE' || dirInfo.direction === 'NW';
             const isSideFacing = dirInfo.direction === 'E' || dirInfo.direction === 'W';
             const isDiagonalDownFacing = dirInfo.direction === 'SE' || dirInfo.direction === 'SW';
+            const isDownFacing = dirInfo.direction === 'S';
             const pickFacingOrUp = (facingKey: string, upKey: string): HTMLImageElement[] | undefined => {
-                if (isDiagonalFacing || isSideFacing || isDiagonalDownFacing) {
+                if (isDiagonalFacing || isSideFacing || isDiagonalDownFacing || isDownFacing) {
                     const facingSet = dict[facingKey];
                     if (facingSet && facingSet.length > 0) return facingSet;
                 }
                 return dict[upKey];
             };
 
-            const gatlingFacingKey = (side: string, diagonal: string, diagonalDown: string): string =>
-                isSideFacing ? side : isDiagonalDownFacing ? diagonalDown : diagonal;
+            const gatlingFacingKey = (side: string, diagonal: string, diagonalDown: string, down: string): string =>
+                isSideFacing ? side : isDiagonalDownFacing ? diagonalDown : isDownFacing ? down : diagonal;
 
-            const gatlingIdle = pickFacingOrUp(gatlingFacingKey('gatlingSide', 'gatlingDiagonal', 'gatlingDiagonalDown'), 'gatlingUp');
-            const gatlingFiring = pickFacingOrUp(gatlingFacingKey('gatlingFiringSide', 'gatlingFiringDiagonal', 'gatlingFiringDiagonalDown'), 'gatlingFiringUp');
-            const gatlingActivation = pickFacingOrUp(gatlingFacingKey('gatlingActivationSide', 'gatlingActivationDiagonal', 'gatlingActivationDiagonalDown'), 'gatlingActivationUp');
+            const gatlingIdle = pickFacingOrUp(gatlingFacingKey('gatlingSide', 'gatlingDiagonal', 'gatlingDiagonalDown', 'gatlingDown'), 'gatlingUp');
+            const gatlingFiring = pickFacingOrUp(gatlingFacingKey('gatlingFiringSide', 'gatlingFiringDiagonal', 'gatlingFiringDiagonalDown', 'gatlingFiringDown'), 'gatlingFiringUp');
+            const gatlingActivation = pickFacingOrUp(gatlingFacingKey('gatlingActivationSide', 'gatlingActivationDiagonal', 'gatlingActivationDiagonalDown', 'gatlingActivationDown'), 'gatlingActivationUp');
 
-            // Only relevant for the one facing still standing in on the "up"
-            // art (S) — NE/NW, E/W, and SE/SW have real art now (same as
-            // they always did for walk/shoot), so none of those three pairs
-            // goes through this rotation trick anymore.
-            needsFallbackRotation = dirInfo.direction === 'S';
+            // S now has its own art too, so it no longer needs the rotation
+            // trick — UNLESS that art is actually missing at runtime, in
+            // which case pickFacingOrUp above silently fell back to the "up"
+            // set for it, and the old rotation trick is still what makes
+            // that fallback look right.
+            const hasDedicatedDownGatlingArt = Boolean(dict.gatlingDown && dict.gatlingDown.length > 0);
+            needsFallbackRotation = isDownFacing && !hasDedicatedDownGatlingArt;
 
             const ACTIVATION_TICKS_PER_FRAME = 4;
             const activationFrameCount = gatlingActivation?.length ?? 0;

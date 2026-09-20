@@ -217,6 +217,13 @@ export interface CharacterSprites {
     gatlingActivationDiagonalDown?: HTMLImageElement[]; // SE/SW variant of gatlingActivationUp
     gatlingDiagonalDown?: HTMLImageElement[];           // SE/SW variant of gatlingUp
     gatlingFiringDiagonalDown?: HTMLImageElement[];     // SE/SW variant of gatlingFiringUp
+    // S (fully/straight down) — NOT the same as the SE/SW pair above. Until
+    // now S had no dedicated gatling art at all and fell back to the "up"
+    // set with a rotation hack (see engine.ts's needsFallbackRotation); this
+    // is the one facing left over from that, same as N still legitimately is.
+    gatlingActivationDown?: HTMLImageElement[]; // S variant of gatlingActivationUp
+    gatlingDown?: HTMLImageElement[];           // S variant of gatlingUp
+    gatlingFiringDown?: HTMLImageElement[];     // S variant of gatlingFiringUp
 }
 
 // A sound the simulation wants played, reported rather than played directly —

@@ -120,6 +120,25 @@ import peaGatlingSE3Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/
 import peaGatlingSE4Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_southeast_4.png';
 import peaGatlingSEFiringSrc from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_southeast_firing.png';
 
+// Pea Gatling — S (fully/straight down) view. NOT the SE/SW pair above —
+// this is the one cardinal facing that, until now, had no dedicated art and
+// fell back to the "up" set with a rotation hack (see engine.ts). S has no
+// mirrored counterpart to reuse either, same as "up" itself.
+// pea_gatling_down_1.png is a duplicate of pea_gatling_down.png, so it's
+// deliberately not imported/used here — same treatment as the up/NE/right/
+// southeast duplicates above.
+import peaGatlingActivationDownSrc from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_activation_down.png';
+import peaGatlingActivationDown1Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_activation_down_1.png';
+import peaGatlingActivationDown2Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_activation_down_2.png';
+import peaGatlingActivationDown3Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_activation_down_3.png';
+import peaGatlingActivationDown4Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_activation_down_4.png';
+import peaGatlingActivationDown5Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_activation_down_5.png';
+import peaGatlingDownSrc from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_down.png';
+import peaGatlingDown2Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_down_2.png';
+import peaGatlingDown3Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_down_3.png';
+import peaGatlingDown4Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_down_4.png';
+import peaGatlingDownFiringSrc from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_down_firing.png';
+
 import peaSpriteSrc from '../assets/Peashooter/Sprites/pea.png';
 import peaFired1Src from '../assets/Peashooter/Sprites/pea_fired_1.png';
 import peaFired2Src from '../assets/Peashooter/Sprites/pea_fired_2.png';
@@ -285,10 +304,20 @@ const drawHyperTrail = (
 // tracer; a long one would just look like a second, wider projectile.
 const MAX_PROJECTILE_TRAIL_POINTS = 8;
 
+// A freshly spawned trail is capped to a handful of visible points (below)
+// and faded in via `growth`, both driven by how long ago the trail started
+// rather than by how many points happen to have accumulated — that keeps
+// the "starts short, races out to full length" pop independent of display
+// refresh rate (point accumulation alone would take longer to read as short
+// on a 30Hz screen than a 144Hz one). Short window + ease-out curve = fast
+// start that settles rather than a mechanically linear grow.
+const TRAIL_GROWTH_MS = 90;
+
 const drawProjectileTrail = (
     ctx: CanvasRenderingContext2D,
     points: { x: number; y: number; z: number }[],
-    color: string
+    color: string,
+    growth: number = 1
 ): void => {
     const n = points.length;
     if (n < 2) return;
@@ -312,7 +341,12 @@ const drawProjectileTrail = (
     for (let i = 0; i < n; i++) {
         const s = perp[i];
         const t = i / (n - 1); // 0 at the tail, 1 at the head (current position)
-        const halfWidth = 0.3 + t * 2.2;
+        // Scaled by `growth` so a brand-new trail starts as a thin sliver
+        // and thickens up to the normal taper as it ages in, instead of
+        // the head snapping straight to full width the moment a 2nd point
+        // exists (t is always 0..1 across whatever points ARE there, so
+        // width alone can't tell "short trail" from "young trail" apart).
+        const halfWidth = (0.3 + t * 2.2) * growth;
         leftEdge.push({ x: s.x + s.perpX * halfWidth, y: s.vy + s.perpY * halfWidth });
         rightEdge.push({ x: s.x - s.perpX * halfWidth, y: s.vy - s.perpY * halfWidth });
     }
@@ -418,6 +452,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
     // Gatling, Z-1 Assault Blaster), keyed by the projectile's own network
     // id so it's independent of any particular player.
     const projectileTrailsRef = useRef<Map<string, { x: number; y: number; z: number }[]>>(new Map());
+    // renderTime (not wall-clock time) each trail first appeared, keyed the
+    // same as projectileTrailsRef — lets the trail's spawn-growth animation
+    // (TRAIL_GROWTH_MS) run off "how long ago this trail started" rather
+    // than off how many points have piled up, so it stays framerate-independent.
+    const projectileTrailSpawnRef = useRef<Map<string, number>>(new Map());
     const whizzedProjectileIdsRef = useRef<Set<string>>(new Set());
     const lastProcessedTickRef = useRef<number>(-1);
     // TEMP DEBUG — rate counters, remove once diagnosis is confirmed.
@@ -541,6 +580,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
             ]),
             gatlingDiagonalDown: loadImages([peaGatlingSESrc, peaGatlingSE2Src, peaGatlingSE3Src, peaGatlingSE4Src]),
             gatlingFiringDiagonalDown: loadImages([peaGatlingSEFiringSrc]),
+
+            // S — the one facing that used to fall back to "up" (see
+            // engine.ts's needsFallbackRotation). pea_gatling_down_1.png
+            // deliberately omitted — duplicate of pea_gatling_down.png.
+            gatlingActivationDown: loadImages([
+                peaGatlingActivationDownSrc, peaGatlingActivationDown1Src, peaGatlingActivationDown2Src,
+                peaGatlingActivationDown3Src, peaGatlingActivationDown4Src, peaGatlingActivationDown5Src,
+            ]),
+            gatlingDown: loadImages([peaGatlingDownSrc, peaGatlingDown2Src, peaGatlingDown3Src, peaGatlingDown4Src]),
+            gatlingFiringDown: loadImages([peaGatlingDownFiringSrc]),
         };
     }, []);
 
@@ -1454,7 +1503,37 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
                 });
             });
 
-            snapshot?.projectiles.forEach((p) => {
+            // Projectiles are removed from server state the instant they hit
+            // something (see server updateProjectiles) — unlike players, who
+            // just flip isDead and stay in the list. Sourcing this loop from
+            // `snapshot` (latestSnapshotRef — the newest, UNDELAYED snapshot)
+            // meant a projectile vanished the moment the server removed it,
+            // in real time — but rendering is deliberately RENDER_DELAY_MS
+            // behind that (see RENDER_DELAY_MS above), so from the delayed
+            // timeline's point of view it disappeared up to RENDER_DELAY_MS
+            // worth of travel distance too early: "a few inches short of the
+            // target" is exactly what that gap looks like, even though the
+            // server's own hit position was correct the whole time. Sourcing
+            // the draw list from the SAME interpolation bracket used to
+            // position everything else keeps a projectile visible for
+            // exactly as long as the delayed timeline says it should be, so
+            // it disappears right where it actually lands instead of early.
+            const bracketProjectiles = new Map<string, ServerSnapshotMessage['projectiles'][number]>();
+            if (interpBracket) {
+                interpBracket.prev.projectiles.forEach((bp) => bracketProjectiles.set(bp.id, bp));
+                interpBracket.next.projectiles.forEach((bp) => bracketProjectiles.set(bp.id, bp)); // next wins where both have it
+            } else {
+                snapshot?.projectiles.forEach((sp) => bracketProjectiles.set(sp.id, sp));
+            }
+
+            // Cosmetic "motion smear" — elongates a projectile along its
+            // direction of travel and squashes it slightly across that axis
+            // (inverse-sqrt keeps the rendered area roughly constant) so
+            // fast shots read as fast. Visual only: doesn't touch the
+            // projectile's actual position, radius, or hit-testing.
+            const PROJECTILE_STRETCH = 1.35;
+
+            bracketProjectiles.forEach((p) => {
                 // Same interpolation the remote-player branch above already
                 // does — was missing here entirely, which is the actual
                 // cause of the jankiness: projectiles were drawn at whatever
@@ -1464,6 +1543,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
                 // increasingly obvious the more of them there are — which is
                 // exactly why a fast-firing weapon made it stand out.
                 let ix = p.x, iy = p.y, iz = p.currentZ;
+                let travelAngle: number | null = null;
                 if (interpBracket) {
                     const bracketPrev = interpBracket.prev.projectiles.find((bp) => bp.id === p.id);
                     const bracketNext = interpBracket.next.projectiles.find((bp) => bp.id === p.id);
@@ -1473,12 +1553,25 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
                         ix = bracketPrev.x + (bracketNext.x - bracketPrev.x) * t;
                         iy = bracketPrev.y + (bracketNext.y - bracketPrev.y) * t;
                         iz = bracketPrev.currentZ + (bracketNext.currentZ - bracketPrev.currentZ) * t;
+
+                        // Direction of travel over this bracket, in the same
+                        // visual (y - z*VISUAL_Y_FACTOR) space everything is
+                        // actually drawn in — used purely to orient the
+                        // stretch effect below, not for positioning.
+                        const dxWorld = bracketNext.x - bracketPrev.x;
+                        const dyVisual =
+                            (bracketNext.y - bracketNext.currentZ * VISUAL_Y_FACTOR) -
+                            (bracketPrev.y - bracketPrev.currentZ * VISUAL_Y_FACTOR);
+                        if (dxWorld !== 0 || dyVisual !== 0) {
+                            travelAngle = Math.atan2(dyVisual, dxWorld);
+                        }
                     }
                     // No bracketPrev usually means the projectile spawned
-                    // this very tick — nothing to lerp from yet, so it falls
-                    // back to its raw snapshot position for one frame and
-                    // starts interpolating smoothly from the next tick on,
-                    // once it exists in two consecutive buffered snapshots.
+                    // this very tick — nothing to lerp (or orient the
+                    // stretch from) yet, so it falls back to its raw
+                    // snapshot position for one frame and starts
+                    // interpolating smoothly from the next tick on, once it
+                    // exists in two consecutive buffered snapshots.
                 }
 
                 // Trail sampling — uses the same interpolated ix/iy/iz as the
@@ -1489,6 +1582,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
                     if (!trail) {
                         trail = [];
                         projectileTrailsRef.current.set(p.id, trail);
+                        projectileTrailSpawnRef.current.set(p.id, renderTime);
                     }
                     trail.push({ x: ix, y: iy, z: iz });
                     if (trail.length > MAX_PROJECTILE_TRAIL_POINTS) trail.shift();
@@ -1509,12 +1603,25 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
                         const heightScale = 1 + iz * Z_HEIGHT_SCALE;
                         const displayRadius = p.weaponRadius * heightScale;
                         const sprite = p.team === 'plants' ? peaSpriteRef.current : null;
+
+                        ctx.translate(ix, drawY);
+                        if (travelAngle !== null) {
+                            // Rotate the stretch axis onto travelAngle, scale,
+                            // then rotate back — the sprite itself is round,
+                            // so un-rotating after the scale leaves its look
+                            // untouched and only the elongation ends up
+                            // aligned with the direction of travel.
+                            ctx.rotate(travelAngle);
+                            ctx.scale(PROJECTILE_STRETCH, 1 / Math.sqrt(PROJECTILE_STRETCH));
+                            ctx.rotate(-travelAngle);
+                        }
+
                         if (sprite && sprite.complete && sprite.naturalWidth !== 0) {
                             const size = displayRadius * 2;
-                            ctx.drawImage(sprite, ix - displayRadius, drawY - displayRadius, size, size);
+                            ctx.drawImage(sprite, -displayRadius, -displayRadius, size, size);
                         } else {
                             ctx.beginPath();
-                            ctx.arc(ix, drawY, displayRadius, 0, Math.PI * 2);
+                            ctx.arc(0, 0, displayRadius, 0, Math.PI * 2);
                             ctx.fillStyle = p.weaponColor;
                             ctx.fill();
                         }
@@ -1526,32 +1633,43 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
             // Trails render as their own pass rather than inside the loop
             // above: a trail's sortY needs to come from its own head point
             // (kept alongside it below), and stale entries — a projectile
-            // that hit something and vanished from this snapshot — need
-            // pruning exactly once per frame, not once per still-live
-            // projectile.
+            // that hit something and dropped out of the current
+            // interpolation bracket — need pruning exactly once per frame,
+            // not once per still-live projectile.
             {
-                const liveProjectileIds = new Set(snapshot?.projectiles.map((p) => p.id) ?? []);
+                const liveProjectileIds = new Set(bracketProjectiles.keys());
                 projectileTrailsRef.current.forEach((trail, id) => {
                     if (!liveProjectileIds.has(id)) {
-                        // Gone from this snapshot — hit something, or expired.
-                        // Simplified relative to the Hyper trail's gradual
-                        // drain-on-deactivate: a projectile disappears
-                        // outright (impact, or its own alpha fade already
-                        // handles range-expiry), so the trail just goes with
-                        // it rather than lingering to drain on its own.
+                        // Gone from the current bracket — hit something, or
+                        // expired. Simplified relative to the Hyper trail's
+                        // gradual drain-on-deactivate: a projectile
+                        // disappears outright (impact, or its own alpha
+                        // fade already handles range-expiry), so the trail
+                        // just goes with it rather than lingering to drain
+                        // on its own.
                         projectileTrailsRef.current.delete(id);
+                        projectileTrailSpawnRef.current.delete(id);
                         return;
                     }
                     if (trail.length < 2) return;
-                    const head = trail[trail.length - 1];
-                    const ownerProjectile = snapshot!.projectiles.find((sp) => sp.id === id)!;
+
+                    // Ease the visible slice of the trail out from the tail
+                    // over TRAIL_GROWTH_MS — see TRAIL_GROWTH_MS's comment.
+                    const spawnTime = projectileTrailSpawnRef.current.get(id) ?? renderTime;
+                    const growthT = Math.max(0, Math.min(1, (renderTime - spawnTime) / TRAIL_GROWTH_MS));
+                    const growth = 1 - Math.pow(1 - growthT, 3); // ease-out cubic: quick to start, settles into full length
+                    const visibleCount = Math.max(2, Math.round(trail.length * growth));
+                    const visiblePoints = visibleCount >= trail.length ? trail : trail.slice(trail.length - visibleCount);
+
+                    const head = visiblePoints[visiblePoints.length - 1];
+                    const ownerProjectile = bracketProjectiles.get(id)!;
                     renderQueue.push({
                         // Slightly behind the projectile's own sortY, same
                         // -0.05 convention as the Hyper trail relative to its
                         // player, so the projectile draws on top of its trail
                         // rather than the trail painting over it.
                         sortY: getEffectiveSortY(head.x, head.y, head.z, ownerProjectile.weaponRadius, structures) - 0.05,
-                        draw: () => drawProjectileTrail(ctx, trail, ownerProjectile.weaponColor),
+                        draw: () => drawProjectileTrail(ctx, visiblePoints, ownerProjectile.weaponColor, growth),
                     });
                 });
             }
