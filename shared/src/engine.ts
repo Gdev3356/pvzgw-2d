@@ -27,7 +27,7 @@ export const CLASS_CONFIGS: Record<CharacterClass, ClassConfig> = {
         weapon: {
             name: 'Pea Cannon',
             maxAmmo: 10,
-            fireRate: 350,
+            fireRate: 410,
             reloadDuration: 1500,
             projectileSpeed: 10,
             directDamage: 25,
