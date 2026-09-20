@@ -1388,27 +1388,53 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
             });
 
             snapshot?.projectiles.forEach((p) => {
+                // Same interpolation the remote-player branch above already
+                // does — was missing here entirely, which is the actual
+                // cause of the jankiness: projectiles were drawn at whatever
+                // position the single most recent snapshot said, jumping in
+                // discrete ~33ms (server tick) steps instead of gliding.
+                // Invisible with only a few projectiles in flight at once;
+                // increasingly obvious the more of them there are — which is
+                // exactly why a fast-firing weapon made it stand out.
+                let ix = p.x, iy = p.y, iz = p.currentZ;
+                if (interpBracket) {
+                    const bracketPrev = interpBracket.prev.projectiles.find((bp) => bp.id === p.id);
+                    const bracketNext = interpBracket.next.projectiles.find((bp) => bp.id === p.id);
+                    if (bracketPrev && bracketNext) {
+                        const span = interpBracket.next.serverTime - interpBracket.prev.serverTime || 1;
+                        const t = Math.max(0, Math.min(1, (renderTime - interpBracket.prev.serverTime) / span));
+                        ix = bracketPrev.x + (bracketNext.x - bracketPrev.x) * t;
+                        iy = bracketPrev.y + (bracketNext.y - bracketPrev.y) * t;
+                        iz = bracketPrev.currentZ + (bracketNext.currentZ - bracketPrev.currentZ) * t;
+                    }
+                    // No bracketPrev usually means the projectile spawned
+                    // this very tick — nothing to lerp from yet, so it falls
+                    // back to its raw snapshot position for one frame and
+                    // starts interpolating smoothly from the next tick on,
+                    // once it exists in two consecutive buffered snapshots.
+                }
+
                 renderQueue.push({
-                    sortY: getEffectiveSortY(p.x, p.y, p.currentZ, p.weaponRadius, structures),
+                    sortY: getEffectiveSortY(ix, iy, iz, p.weaponRadius, structures),
                     draw: () => {
                         ctx.save();
                         ctx.globalAlpha = p.alpha;
-                        const drawY = p.y - p.currentZ * VISUAL_Y_FACTOR;
+                        const drawY = iy - iz * VISUAL_Y_FACTOR;
                         // This one path draws every generic projectile — primary
                         // weapon, Pea Gatling, and ZPG all funnel through the same
                         // state.projectiles array — so it was missing the same
                         // height-based scale chiliBeans/stinkGrenades/explosions
                         // already apply, making shots look identically-sized
                         // regardless of how high up they were.
-                        const heightScale = 1 + p.currentZ * Z_HEIGHT_SCALE;
+                        const heightScale = 1 + iz * Z_HEIGHT_SCALE;
                         const displayRadius = p.weaponRadius * heightScale;
                         const sprite = p.team === 'plants' ? peaSpriteRef.current : null;
                         if (sprite && sprite.complete && sprite.naturalWidth !== 0) {
                             const size = displayRadius * 2;
-                            ctx.drawImage(sprite, p.x - displayRadius, drawY - displayRadius, size, size);
+                            ctx.drawImage(sprite, ix - displayRadius, drawY - displayRadius, size, size);
                         } else {
                             ctx.beginPath();
-                            ctx.arc(p.x, drawY, displayRadius, 0, Math.PI * 2);
+                            ctx.arc(ix, drawY, displayRadius, 0, Math.PI * 2);
                             ctx.fillStyle = p.weaponColor;
                             ctx.fill();
                         }
