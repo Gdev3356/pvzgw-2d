@@ -6,6 +6,8 @@ on:
     paths:
       - 'server/**'
       - 'shared/**'
+      - '.github/workflows/deploy-server.yml'
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -13,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-            - name: Set up SSH
+      - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.ORACLE_SSH_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
@@ -25,13 +27,13 @@ jobs:
           ssh-keygen -y -f ~/.ssh/deploy_key > /dev/null \
             && echo "Key parses correctly." \
             || (echo "::error::Deploy key failed to parse — check for corruption in the ORACLE_SSH_KEY secret" && exit 1)
-      
+
       - name: Sync server + shared only
         run: |
           ssh -i ~/.ssh/deploy_key ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }} "mkdir -p ~/pvzgw-2d"
           rsync -avz --delete \
             -e "ssh -i ~/.ssh/deploy_key" \
-            --exclude 'node_modules' --exclude 'dist' \
+            --exclude 'node_modules' --exclude 'dist' --exclude '.env' \
             server shared \
             ${{ secrets.ORACLE_USER }}@${{ secrets.ORACLE_HOST }}:~/pvzgw-2d/
 

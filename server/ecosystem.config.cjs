@@ -1,3 +1,10 @@
+// server/ecosystem.config.cjs
+// Environment-specific values (PORT/HOST/CLIENT_ORIGIN) live in server/.env,
+// which is gitignored and excluded from the deploy workflow's rsync — this
+// file is deliberately identical everywhere and safe for CI to overwrite on
+// every push. Edit server/.env on the box, never this file, for config.
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+
 module.exports = {
     apps: [
         {
@@ -7,11 +14,9 @@ module.exports = {
             cwd: __dirname,
             max_memory_restart: '250M',
             env: {
-                PORT: 3001,
-                HOST: '127.0.0.1',
-                // Update this if your client ends up on the apex domain
-                // instead of *.vercel.app — see the note below.
-                CLIENT_ORIGIN: 'https://www.pvzgw2d.com.br',
+                PORT: process.env.PORT,
+                HOST: process.env.HOST,
+                CLIENT_ORIGIN: process.env.CLIENT_ORIGIN,
             },
         },
     ],
