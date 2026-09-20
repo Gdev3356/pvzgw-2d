@@ -195,6 +195,7 @@ export function startRoom(io: Server): void {
                 team: p.team, alpha: p.alpha,
                 weaponColor: p.weapon.projectileColor,
                 weaponRadius: p.weapon.projectileRadius,
+                hasTrail: p.weapon.hasTrail ?? false,
             })),
             chiliBeans: state.chiliBeans.map((b) => ({
                 id: b.id, x: b.x, y: b.y, z: b.z, isLanded: b.isLanded, fuseTimer: b.fuseTimer, radius: b.radius,

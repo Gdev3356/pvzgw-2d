@@ -272,6 +272,68 @@ const drawHyperTrail = (
     });
 };
 
+// Same tapered-ribbon idea as drawHyperTrail, deliberately simplified for a
+// projectile: one strand instead of three parallel ones (a small object
+// doesn't need the "width" a player-sized trail does), a much smaller taper,
+// and colored to match the projectile itself rather than a fixed green —
+// different weapons have different weaponColor, so this reads correctly for
+// any of them without per-weapon trail-color configuration.
+// NOTE: assumes color is a clean 6-digit "#RRGGBB" hex string (true of every
+// current weaponColor) — the alpha suffixes below rely on that.
+// Deliberately shorter than a player's MAX_TRAIL_POINTS (26) — a projectile
+// travels in a straight/near-straight line, so a short streak reads as a
+// tracer; a long one would just look like a second, wider projectile.
+const MAX_PROJECTILE_TRAIL_POINTS = 8;
+
+const drawProjectileTrail = (
+    ctx: CanvasRenderingContext2D,
+    points: { x: number; y: number; z: number }[],
+    color: string
+): void => {
+    const n = points.length;
+    if (n < 2) return;
+
+    const visualY = (p: { y: number; z: number }) => p.y - p.z * VISUAL_Y_FACTOR;
+
+    const perp: { x: number; vy: number; perpX: number; perpY: number }[] = [];
+    for (let i = 0; i < n; i++) {
+        const p = points[i];
+        const vy = visualY(p);
+        const prev = points[i - 1] ?? p;
+        const next = points[i + 1] ?? p;
+        const dirX = next.x - prev.x;
+        const dirY = visualY(next) - visualY(prev);
+        const dirLen = Math.hypot(dirX, dirY) || 1;
+        perp.push({ x: p.x, vy, perpX: -dirY / dirLen, perpY: dirX / dirLen });
+    }
+
+    const leftEdge: Vector2D[] = [];
+    const rightEdge: Vector2D[] = [];
+    for (let i = 0; i < n; i++) {
+        const s = perp[i];
+        const t = i / (n - 1); // 0 at the tail, 1 at the head (current position)
+        const halfWidth = 0.3 + t * 2.2;
+        leftEdge.push({ x: s.x + s.perpX * halfWidth, y: s.vy + s.perpY * halfWidth });
+        rightEdge.push({ x: s.x - s.perpX * halfWidth, y: s.vy - s.perpY * halfWidth });
+    }
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(leftEdge[0].x, leftEdge[0].y);
+    for (let i = 1; i < n; i++) ctx.lineTo(leftEdge[i].x, leftEdge[i].y);
+    for (let i = n - 1; i >= 0; i--) ctx.lineTo(rightEdge[i].x, rightEdge[i].y);
+    ctx.closePath();
+
+    const head = perp[n - 1];
+    const tail = perp[0];
+    const gradient = ctx.createLinearGradient(tail.x, tail.vy, head.x, head.vy);
+    gradient.addColorStop(0, `${color}00`);
+    gradient.addColorStop(1, `${color}99`);
+    ctx.fillStyle = gradient;
+    ctx.fill();
+    ctx.restore();
+};
+
 // We deliberately render slightly in the past so there's always a pair of
 // server snapshots to interpolate between (smooths over normal network
 // jitter, same idea as most client-side entity interpolation schemes).
@@ -351,6 +413,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
     // hyperTrailPoints array below, just one per remote player instead of
     // a single one scoped to `player`.
     const remoteHyperTrailsRef = useRef<Map<string, { x: number; y: number; z: number }[]>>(new Map());
+    // Same idea, one per projectile instead of one per player — only
+    // populated for projectiles whose weapon has hasTrail set (Pea Cannon/
+    // Gatling, Z-1 Assault Blaster), keyed by the projectile's own network
+    // id so it's independent of any particular player.
+    const projectileTrailsRef = useRef<Map<string, { x: number; y: number; z: number }[]>>(new Map());
     const whizzedProjectileIdsRef = useRef<Set<string>>(new Set());
     const lastProcessedTickRef = useRef<number>(-1);
     // TEMP DEBUG — rate counters, remove once diagnosis is confirmed.
@@ -1414,6 +1481,19 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
                     // once it exists in two consecutive buffered snapshots.
                 }
 
+                // Trail sampling — uses the same interpolated ix/iy/iz as the
+                // projectile itself, so the trail is exactly as smooth as
+                // the head it's attached to, not a jankier version of it.
+                if (p.hasTrail) {
+                    let trail = projectileTrailsRef.current.get(p.id);
+                    if (!trail) {
+                        trail = [];
+                        projectileTrailsRef.current.set(p.id, trail);
+                    }
+                    trail.push({ x: ix, y: iy, z: iz });
+                    if (trail.length > MAX_PROJECTILE_TRAIL_POINTS) trail.shift();
+                }
+
                 renderQueue.push({
                     sortY: getEffectiveSortY(ix, iy, iz, p.weaponRadius, structures),
                     draw: () => {
@@ -1442,6 +1522,39 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
                     },
                 });
             });
+
+            // Trails render as their own pass rather than inside the loop
+            // above: a trail's sortY needs to come from its own head point
+            // (kept alongside it below), and stale entries — a projectile
+            // that hit something and vanished from this snapshot — need
+            // pruning exactly once per frame, not once per still-live
+            // projectile.
+            {
+                const liveProjectileIds = new Set(snapshot?.projectiles.map((p) => p.id) ?? []);
+                projectileTrailsRef.current.forEach((trail, id) => {
+                    if (!liveProjectileIds.has(id)) {
+                        // Gone from this snapshot — hit something, or expired.
+                        // Simplified relative to the Hyper trail's gradual
+                        // drain-on-deactivate: a projectile disappears
+                        // outright (impact, or its own alpha fade already
+                        // handles range-expiry), so the trail just goes with
+                        // it rather than lingering to drain on its own.
+                        projectileTrailsRef.current.delete(id);
+                        return;
+                    }
+                    if (trail.length < 2) return;
+                    const head = trail[trail.length - 1];
+                    const ownerProjectile = snapshot!.projectiles.find((sp) => sp.id === id)!;
+                    renderQueue.push({
+                        // Slightly behind the projectile's own sortY, same
+                        // -0.05 convention as the Hyper trail relative to its
+                        // player, so the projectile draws on top of its trail
+                        // rather than the trail painting over it.
+                        sortY: getEffectiveSortY(head.x, head.y, head.z, ownerProjectile.weaponRadius, structures) - 0.05,
+                        draw: () => drawProjectileTrail(ctx, trail, ownerProjectile.weaponColor),
+                    });
+                });
+            }
 
             snapshot?.explosions.forEach((exp) => {
                 let sortY = getEffectiveSortY(exp.x, exp.y, exp.z, exp.currentRadius, structures, 15);

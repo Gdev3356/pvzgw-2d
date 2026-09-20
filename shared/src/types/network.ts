@@ -75,6 +75,7 @@ export interface NetworkedProjectile {
     alpha: number;
     weaponColor: string;
     weaponRadius: number;
+    hasTrail: boolean;
 }
 
 // What the server broadcasts, every tick

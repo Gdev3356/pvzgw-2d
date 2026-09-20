@@ -38,6 +38,12 @@ export interface WeaponConfig {
     minDamage: number;
     projectileRadius: number;
     projectileColor: string;
+    // Opt-in, not automatic — a tracer on every projectile (chili beans,
+    // stink grenades, every future thrown/fired thing) would be visual
+    // noise rather than a readable streak. Only set true where a trail
+    // actually reads as intentional: fast, straight-line hitscan-feeling
+    // shots, not lobbed/arcing throwables.
+    hasTrail?: boolean;
 }
 
 export interface AbilityConfig {

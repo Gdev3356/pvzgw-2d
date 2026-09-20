@@ -38,6 +38,7 @@ export const CLASS_CONFIGS: Record<CharacterClass, ClassConfig> = {
             minDamage: 18,
             projectileRadius: 7,
             projectileColor: '#8BC34A',
+            hasTrail: true,
         },
         abilities: {
             ability1: { id: 'chili_bean', name: 'Chili Bean', cooldown: 12000, keyBind: 'Q', description: 'Deploys a ticking bomb with huge splash damage.' },
@@ -68,6 +69,7 @@ export const CLASS_CONFIGS: Record<CharacterClass, ClassConfig> = {
             minDamage: 5,
             projectileRadius: 3,
             projectileColor: '#FFC107',
+            hasTrail: true,
         },
         abilities: {
             ability1: { id: 'stink_cloud', name: 'Stink Cloud', cooldown: 14000, keyBind: 'Q', description: 'Throws a gas grenade that deploys toxic mist.' },

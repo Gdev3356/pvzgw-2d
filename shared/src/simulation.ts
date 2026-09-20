@@ -195,6 +195,14 @@ export function updateShooting(
                 projectileSpeed: 13,
                 projectileColor: '#C0CA33',
                 projectileRadius: 4,
+                // Gatling inherited the full Pea Cannon's splashRadius (50)
+                // via the spread above — proportionally way too big for a
+                // rapid-fire, individually-weaker shot. triggerExplosion's
+                // maxRadius comes directly from this same number, so this
+                // one value shrinks both the actual AOE damage radius and
+                // the visual hit-effect ring size together; splashDamage is
+                // untouched, only the reach/size of the explosion.
+                splashRadius: 24,
             };
             state.projectiles.push(new Projectile(
                 player.x, player.y, fireAngle, gatlingWeapon, player.team,
