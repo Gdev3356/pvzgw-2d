@@ -10,6 +10,9 @@ import {
     StinkGrenade,
     MapStructure,
     CharacterSprites,
+    LayeredAnimState,
+    LayeredDirection,
+    LayeredBodyPart,
     PendingSoundEvent,
 } from './types/game';
 
@@ -358,6 +361,26 @@ export class Player {
 
     pendingSoundEvents: PendingSoundEvent[] = [];
 
+    // --- Layered (head/lowerBody) animation state — regular movement only,
+    // Pea Gatling still uses the single-sprite gatling* path untouched. ---
+    //
+    // airborneAnimState is the top-priority override for both layers: while
+    // set, it wins over firing/blink/walking/idle entirely. null means
+    // grounded — normal state resolution applies.
+    airborneAnimState: 'jumping' | 'falling' | 'landing' | null = null;
+    // Set the tick this.z last exceeded groundZ; cleared once grounded again.
+    // Only used to detect the airborne->grounded edge that starts 'landing'.
+    wasAirborneLastTick: boolean = false;
+    jumpAnimTimer: number = 0;   // ticks since entering 'jumping' — holds on the last frame once exhausted, never loops
+    fallAnimTimer: number = 0;   // ticks since entering 'falling' — frame 0 once, then loops 1/2
+    landingTimer: number = 0;    // ticks since entering 'landing' — reverts to grounded resolution once past LANDING_DURATION_TICKS
+    // Per-layer "last successfully drawn frame" — when a (direction, state)
+    // combo has no art yet (asset coverage is still partial per direction),
+    // the layer freezes on whichever of these it last set, rather than
+    // popping to nothing or silently reverting to idle.
+    lastHeadSprite: HTMLImageElement | null = null;
+    lastLowerBodySprite: HTMLImageElement | null = null;
+
     private queueSound(key: string, volume?: number, pitchVariation?: number): void {
         this.pendingSoundEvents.push({ key, volume, pitchVariation });
     }
@@ -413,6 +436,13 @@ export class Player {
         this.vz = 0;
         this.jumpVx = 0;
         this.jumpVy = 0;
+        this.airborneAnimState = null;
+        this.wasAirborneLastTick = false;
+        this.jumpAnimTimer = 0;
+        this.fallAnimTimer = 0;
+        this.landingTimer = 0;
+        this.lastHeadSprite = null;
+        this.lastLowerBodySprite = null;
         this.lastJumpTime = 0;
         this.cooldowns = { Q: 0, E: 0, F: 0 };
         this.activeBuffs = { hyper: 0 };
@@ -478,6 +508,7 @@ export class Player {
     // idle branch, just decoupled from movement input.
     applyRemotePuppetState(
         x: number, y: number, z: number, angle: number,
+        vz: number,
         isMoving: boolean, isShootingNow: boolean,
         isHyperActive: boolean,
         hyperRemaining: number,
@@ -487,6 +518,7 @@ export class Player {
         this.x = x;
         this.y = y;
         this.z = z;
+        this.vz = vz;
         this.angle = angle;
         this.isMoving = isMoving;
 
@@ -930,6 +962,48 @@ export class Player {
         this.y = Math.max(this.radius, Math.min(mapBounds.height - this.radius, nextY));
 
         this.angle = overrideAngle !== undefined ? overrideAngle : getAngle(this.x, this.y, mousePos.x, mousePos.y);
+
+        this.updateAirborneAnimState(dt60);
+    }
+
+    // Drives airborneAnimState off the same z/vz/groundZ physics both local
+    // prediction and the server's authoritative sim already compute —
+    // shared here so local player and remote puppets resolve identically.
+    // Callers must set this.groundZ correctly first (see comment at the
+    // GameCanvas puppet-sync call site — computeGroundZ has to run before
+    // this, not after).
+    updateAirborneAnimState(dt60: number): void {
+        // Tuned by eye, same as the gatling animation timings elsewhere in
+        // this file — easy single numbers to adjust after a playtest.
+        const LANDING_DURATION_TICKS = 10;
+        const AIRBORNE_EPSILON = 0.5; // avoids flicker right at ground level from float jitter
+
+        const isAirborne = this.z > this.groundZ + AIRBORNE_EPSILON;
+
+        if (isAirborne) {
+            if (this.vz > 0) {
+                if (this.airborneAnimState !== 'jumping') this.jumpAnimTimer = 0;
+                else this.jumpAnimTimer += dt60;
+                this.airborneAnimState = 'jumping';
+            } else {
+                if (this.airborneAnimState !== 'falling') this.fallAnimTimer = 0;
+                else this.fallAnimTimer += dt60;
+                this.airborneAnimState = 'falling';
+            }
+            this.wasAirborneLastTick = true;
+            this.landingTimer = 0;
+        } else {
+            if (this.wasAirborneLastTick) {
+                this.airborneAnimState = 'landing';
+                this.landingTimer = 0;
+            } else if (this.airborneAnimState === 'landing') {
+                this.landingTimer += dt60;
+                if (this.landingTimer >= LANDING_DURATION_TICKS) this.airborneAnimState = null;
+            } else {
+                this.airborneAnimState = null;
+            }
+            this.wasAirborneLastTick = false;
+        }
     }
 
     draw(ctx: CanvasRenderingContext2D, sprites?: CharacterSprites | HTMLImageElement[] | null): void {
@@ -974,6 +1048,131 @@ export class Player {
         ctx.scale(scale, scale);
 
         const dirInfo = get8WayDirection(this.angle);
+
+        const layeredSprites = sprites && !Array.isArray(sprites) ? (sprites as CharacterSprites) : null;
+        const hasLayeredArt = Boolean(layeredSprites?.head && layeredSprites?.lowerBody);
+
+        if (!this.isGatlingMode && !this.isGatlingDeactivating && hasLayeredArt) {
+            // === Head/lowerBody split — regular movement only ===
+            // Pea Gatling always falls to the else branch below (existing
+            // single-sprite system, unchanged), same as any character/state
+            // that doesn't have layered art yet (e.g. Foot Soldier, until it
+            // gets its own head/lowerBody set).
+            const toLayeredDirection = (dir: string): LayeredDirection => {
+                switch (dir) {
+                    case 'E': case 'W': return 'right';
+                    case 'NE': case 'NW': return 'northeast';
+                    case 'SE': case 'SW': return 'southeast';
+                    case 'S': return 'down';
+                    case 'N': default: return 'up';
+                }
+            };
+            const dirKey = toLayeredDirection(dirInfo.direction);
+
+            // Body favors movement over a stationary "brace" firing pose —
+            // legs keep cycling through the walk animation even while also
+            // shooting, which is what actually produces "running-shooting"
+            // rather than one fully overriding the other. Head favors
+            // firing over everything except being airborne, since aiming
+            // is independent of leg movement.
+            const resolveLayerState = (preferMovement: boolean): LayeredAnimState => {
+                if (this.airborneAnimState) return this.airborneAnimState;
+                if (preferMovement) {
+                    if (this.isMoving) return 'walking';
+                    if (this.isShooting) return 'firing';
+                    return 'idle';
+                }
+                if (this.isShooting) return 'firing';
+                if (this.isBlinking) return 'blink';
+                if (this.isMoving) return 'walking';
+                return 'idle';
+            };
+            const bodyState = resolveLayerState(true);
+            const headState = resolveLayerState(false);
+
+            const pickLayerFrame = (
+                part: LayeredBodyPart | undefined,
+                state: LayeredAnimState,
+                lastShown: HTMLImageElement | null
+            ): HTMLImageElement | null => {
+                const frames = part?.[dirKey]?.[state];
+                // No art for this exact (direction, state) combo yet —
+                // freeze on whatever this layer last showed instead of
+                // popping to nothing or silently reverting to idle. Asset
+                // coverage is still partial per direction/state on purpose;
+                // this is what lets that be true without looking broken.
+                if (!frames || frames.length === 0) return lastShown;
+
+                switch (state) {
+                    case 'walking':
+                        if (frames.length >= 3) {
+                            const ticksPerFrame = 7;
+                            const cycleStep = Math.floor(this.animTimer / ticksPerFrame) % 4;
+                            return [frames[1], frames[0], frames[2], frames[0]][cycleStep];
+                        }
+                        return frames[Math.floor(this.animTimer / 7) % frames.length];
+                    case 'firing': {
+                        const ticksPerFrame = Math.max(1, 12 / frames.length);
+                        const idx = Math.floor((12 - this.shootTimer) / ticksPerFrame) % frames.length;
+                        return frames[((idx % frames.length) + frames.length) % frames.length] ?? frames[0];
+                    }
+                    case 'blink':
+                        if (frames.length > 1) {
+                            const idx = Math.floor((this.blinkDuration - this.blinkTimer) / Math.max(1, this.blinkDuration / frames.length)) % frames.length;
+                            return frames[idx];
+                        }
+                        return frames[0];
+                    case 'jumping': {
+                        // Advances through the jump frames, then HOLDS on the
+                        // last one for as long as still ascending — never
+                        // loops back, per the "stays on the last frame it
+                        // has" spec.
+                        const ticksPerFrame = 5;
+                        const idx = Math.min(frames.length - 1, Math.floor(this.jumpAnimTimer / ticksPerFrame));
+                        return frames[idx];
+                    }
+                    case 'falling': {
+                        // Plays the single "falling" pose once, then loops
+                        // frames[1]/frames[2] until landing — per spec.
+                        const FIRST_FRAME_TICKS = 6;
+                        if (this.fallAnimTimer < FIRST_FRAME_TICKS || frames.length < 3) return frames[0];
+                        const loopTimer = this.fallAnimTimer - FIRST_FRAME_TICKS;
+                        const ticksPerFrame = 6;
+                        const loopIdx = 1 + (Math.floor(loopTimer / ticksPerFrame) % 2);
+                        return frames[Math.min(frames.length - 1, loopIdx)];
+                    }
+                    case 'landing':
+                    case 'idle':
+                    default:
+                        return frames[0];
+                }
+            };
+
+            const bodySprite = pickLayerFrame(layeredSprites!.lowerBody, bodyState, this.lastLowerBodySprite);
+            const headSprite = pickLayerFrame(layeredSprites!.head, headState, this.lastHeadSprite);
+            this.lastLowerBodySprite = bodySprite;
+            this.lastHeadSprite = headSprite;
+
+            // Same renderSize/mirror math the single-sprite path already
+            // uses below — deliberately identical, since both layers'
+            // artwork shares the same canvas size/transparent padding as
+            // the original single sprites did. No fallback-rotation here:
+            // unlike the old system's historical partial coverage (which
+            // that trick compensated for), missing art in this new system
+            // is handled by the freeze-fallback above instead.
+            const drawLayer = (sprite: HTMLImageElement | null): void => {
+                if (!sprite || !sprite.complete || sprite.naturalWidth === 0) return;
+                const renderSize = this.radius * 3.55;
+                ctx.save();
+                ctx.scale(dirInfo.scaleX, dirInfo.scaleY);
+                ctx.drawImage(sprite, -renderSize / 2, -renderSize / 2, renderSize, renderSize);
+                ctx.restore();
+            };
+            // Body first (behind), head second (in front) — standard
+            // character layering.
+            drawLayer(bodySprite);
+            drawLayer(headSprite);
+        } else {
 
         let upSprites: HTMLImageElement[] | null = null;
         let sideSprites: HTMLImageElement[] | null = null;
@@ -1192,6 +1391,7 @@ export class Player {
 
             ctx.restore();
         }
+        }
 
         ctx.restore();
     }
@@ -1221,6 +1421,11 @@ export class Player {
             this.y = spawnY;
             this.z = 0;
             this.vz = 0;
+            this.airborneAnimState = null;
+            this.wasAirborneLastTick = false;
+            this.jumpAnimTimer = 0;
+            this.fallAnimTimer = 0;
+            this.landingTimer = 0;
         }
     }
 }

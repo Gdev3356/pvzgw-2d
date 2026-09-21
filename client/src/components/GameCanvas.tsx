@@ -9,6 +9,9 @@ import {
     CharacterClass,
     MapStructure,
     CharacterSprites,
+    LayeredBodyPart,
+    LayeredDirection,
+    LayeredAnimState,
 } from '@shared/types/game';
 
 import { socket } from '../utils/network';
@@ -422,6 +425,22 @@ const STRUCTURES: MapStructure[] = [
     },
 ];
 
+// Head/lowerBody split — loaded via import.meta.glob rather than one named
+// import per file. This set is already ~90 files and growing as more
+// direction/state combinations get art; a glob keeps adding a new frame
+// later a matter of dropping the file in, not also writing a new import
+// line and loadImages() call for it. Vite resolves each match to its final
+// built asset URL as the module's default export. This only matches files
+// with an extra "_<bodypart>_" segment (peashooter_down_head_idle.png etc),
+// so it doesn't overlap with the old single-sprite peashooter_*.png files
+// or the pea_gatling_*.png files, both of which live under this same
+// Sprites/ folder but don't match this specific shape.
+const layeredSpriteModules = import.meta.glob<{ default: string }>(
+    '../assets/Peashooter/Sprites/peashooter_*_*_*.png',
+    { eager: true }
+);
+const LAYERED_FILENAME_RE = /peashooter_([a-z]+)_(head|lowerbody)_([a-z]+)(?:_(\d+))?\.png$/;
+
 export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUpdate }) => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const playerRef = useRef<Player | null>(null);
@@ -524,7 +543,40 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
                 return img;
             });
 
+        // Groups the flat glob match list into direction -> state -> sorted
+        // frames, for one bodypart at a time (called once for 'head', once
+        // for 'lowerbody'). frameIndex defaults to 0 for the base file with
+        // no numeric suffix (e.g. peashooter_down_head_idle.png has no
+        // trailing _N, sorts first ahead of _1, _2, etc).
+        const buildLayeredBodyPart = (bodypart: 'head' | 'lowerbody'): LayeredBodyPart => {
+            const buckets: Record<string, Record<string, { frameIndex: number; url: string }[]>> = {};
+
+            for (const [path, mod] of Object.entries(layeredSpriteModules)) {
+                const match = path.match(LAYERED_FILENAME_RE);
+                if (!match || match[2] !== bodypart) continue;
+                const [, direction, , state, frameIndexStr] = match;
+                const frameIndex = frameIndexStr ? parseInt(frameIndexStr, 10) : 0;
+                if (!buckets[direction]) buckets[direction] = {};
+                if (!buckets[direction][state]) buckets[direction][state] = [];
+                buckets[direction][state].push({ frameIndex, url: mod.default });
+            }
+
+            const part: LayeredBodyPart = {};
+            for (const direction of Object.keys(buckets)) {
+                const dirKey = direction as LayeredDirection;
+                part[dirKey] = {};
+                for (const state of Object.keys(buckets[direction])) {
+                    const stateKey = state as LayeredAnimState;
+                    const sorted = buckets[direction][state].sort((a, b) => a.frameIndex - b.frameIndex);
+                    part[dirKey]![stateKey] = loadImages(sorted.map((f) => f.url));
+                }
+            }
+            return part;
+        };
+
         peashooterSpritesRef.current = {
+            head: buildLayeredBodyPart('head'),
+            lowerBody: buildLayeredBodyPart('lowerbody'),
             up: loadImages([peashooterIdleSrc, peashooterWalk1Src, peashooterWalk2Src]),
             diagonal: loadImages([peashooterNEIdleSrc, peashooterNEWalk1Src, peashooterNEWalk2Src]),
             side: loadImages([peashooterRightIdleSrc, peashooterRightWalk1Src, peashooterRightWalk2Src]),
@@ -1051,7 +1103,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
                     // here directly, but applyRemotePuppetState immediately overwrote
                     // it with a Date.now()-based value, silently reintroducing a
                     // clock mismatch. Single source of truth now.
-                    puppet.applyRemotePuppetState(ix, iy, iz, iangle, netPlayer.isMoving, netPlayer.isShooting, netPlayer.isHyperActive, netPlayer.activeBuffs.hyperRemaining, dt60, time);
+                    puppet.applyRemotePuppetState(ix, iy, iz, iangle, netPlayer.vz, netPlayer.isMoving, netPlayer.isShooting, netPlayer.isHyperActive, netPlayer.activeBuffs.hyperRemaining, dt60, time);
 
                     // Just transitioned false -> true: a remote player pulled the trigger.
                     // Mirrors the local-player muzzle-flash spawn that's driven off the
@@ -1075,6 +1127,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
                     // raw z instead of height above its actual surface,
                     // breaking scaling for anyone standing on a roof/wall.
                     puppet.groundZ = computeGroundZ(ix, iy, iz, puppet.radius, structures);
+                    puppet.updateAirborneAnimState(dt60);
 
                     // Same per-frame trail sampling as the local player's block
                     // below, just keyed per puppet id so each remote Hyper user

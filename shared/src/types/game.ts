@@ -172,6 +172,16 @@ export interface ExplosionEffect {
     impactStructureId?: string;
 }
 
+export type LayeredAnimState = 'idle' | 'walking' | 'firing' | 'blink' | 'jumping' | 'falling' | 'landing';
+// Same 5-bucket grouping the single-sprite system already uses (NE/NW share
+// one set, E/W share one set, SE/SW share one set) — just named to match
+// the new asset filenames directly instead of the old "diagonal"/"side"/
+// "diagonalDown" internal names.
+export type LayeredDirection = 'up' | 'down' | 'northeast' | 'right' | 'southeast';
+
+export type LayeredDirectionSprites = Partial<Record<LayeredAnimState, HTMLImageElement[]>>;
+export type LayeredBodyPart = Partial<Record<LayeredDirection, LayeredDirectionSprites>>;
+
 export interface CharacterSprites {
     up?: HTMLImageElement[];
     diagonal?: HTMLImageElement[];
@@ -224,6 +234,13 @@ export interface CharacterSprites {
     gatlingActivationDown?: HTMLImageElement[]; // S variant of gatlingActivationUp
     gatlingDown?: HTMLImageElement[];           // S variant of gatlingUp
     gatlingFiringDown?: HTMLImageElement[];     // S variant of gatlingFiringUp
+
+    // Head/lowerBody split — regular movement only. Pea Gatling keeps using
+    // the single-sprite gatling* fields above unchanged; you can't move
+    // while rooted, so there's no walking/firing blend to gain by splitting
+    // it, and it'd just be extra art for zero visual benefit.
+    head?: LayeredBodyPart;
+    lowerBody?: LayeredBodyPart;
 }
 
 // A sound the simulation wants played, reported rather than played directly —

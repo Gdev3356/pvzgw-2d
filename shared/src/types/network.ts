@@ -49,6 +49,7 @@ export interface NetworkedDummy {
 export interface NetworkedPlayerState {
     id: string;
     x: number; y: number; z: number; angle: number;
+    vz: number;
     health: number; maxHealth: number;
     // Server's snapshot mapping already sends this field; it was missing
     // from this interface (an existing gap — tsc would have flagged it as

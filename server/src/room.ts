@@ -168,6 +168,7 @@ export function startRoom(io: Server): void {
             players: Array.from(players.entries()).map(([id, p]) => ({
                 id,
                 x: p.x, y: p.y, z: p.z, angle: p.angle,
+                vz: p.vz,
                 health: p.health, maxHealth: p.maxHealth,
                 isDead: p.isDead,
                 ammo: p.ammo, maxAmmo: p.maxAmmo,
