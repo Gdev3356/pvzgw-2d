@@ -1073,16 +1073,18 @@ export class Player {
             // legs keep cycling through the walk animation even while also
             // shooting, which is what actually produces "running-shooting"
             // rather than one fully overriding the other. Head favors
-            // firing over everything except being airborne, since aiming
-            // is independent of leg movement.
+            // firing over everything, including being airborne — aiming is
+            // independent of leg movement, so you can see a firing head
+            // while jumping/falling, not just while grounded.
             const resolveLayerState = (preferMovement: boolean): LayeredAnimState => {
-                if (this.airborneAnimState) return this.airborneAnimState;
                 if (preferMovement) {
+                    if (this.airborneAnimState) return this.airborneAnimState;
                     if (this.isMoving) return 'walking';
                     if (this.isShooting) return 'firing';
                     return 'idle';
                 }
                 if (this.isShooting) return 'firing';
+                if (this.airborneAnimState) return this.airborneAnimState;
                 if (this.isBlinking) return 'blink';
                 if (this.isMoving) return 'walking';
                 return 'idle';
@@ -1095,15 +1097,30 @@ export class Player {
                 state: LayeredAnimState,
                 lastShown: HTMLImageElement | null
             ): HTMLImageElement | null => {
-                const frames = part?.[dirKey]?.[state];
-                // No art for this exact (direction, state) combo yet —
-                // freeze on whatever this layer last showed instead of
-                // popping to nothing or silently reverting to idle. Asset
-                // coverage is still partial per direction/state on purpose;
-                // this is what lets that be true without looking broken.
-                if (!frames || frames.length === 0) return lastShown;
+                let frames = part?.[dirKey]?.[state];
+                let effectiveState = state;
+                if (!frames || frames.length === 0) {
+                    // No art for this exact (direction, state) yet — degrade
+                    // to idle first, since idle art exists for every
+                    // direction/bodypart, rather than freezing on whatever
+                    // was last shown. That freeze sounds equivalent but
+                    // isn't: "last shown" could easily be a stale firing or
+                    // blink pose left over from a moment ago (e.g. walking
+                    // down with no down-head-walking art, right after
+                    // firing, would otherwise freeze on the firing pose
+                    // instead of settling back to idle). Only if idle art is
+                    // ALSO missing for this direction does this truly freeze
+                    // on lastShown, as a final safety net.
+                    const idleFrames = part?.[dirKey]?.idle;
+                    if (state !== 'idle' && idleFrames && idleFrames.length > 0) {
+                        frames = idleFrames;
+                        effectiveState = 'idle';
+                    } else {
+                        return lastShown;
+                    }
+                }
 
-                switch (state) {
+                switch (effectiveState) {
                     case 'walking':
                         if (frames.length >= 3) {
                             const ticksPerFrame = 7;
