@@ -17,46 +17,6 @@ import {
 import { socket } from '../utils/network';
 import { ServerSnapshotMessage } from '@shared/types/network';
 
-// Up Sprites
-import peashooterIdleSrc from '../assets/Peashooter/Sprites/peashooter_up.png';
-import peashooterWalk1Src from '../assets/Peashooter/Sprites/peashooter_up_1.png';
-import peashooterWalk2Src from '../assets/Peashooter/Sprites/peashooter_up_2.png';
-import peashooterUpShoot1Src from '../assets/Peashooter/Sprites/peashooter_up_shoot_1.png';
-import peashooterUpShoot2Src from '../assets/Peashooter/Sprites/peashooter_up_shoot_2.png';
-
-// Northeast / Diagonal Sprites
-import peashooterNEIdleSrc from '../assets/Peashooter/Sprites/peashooter_northeast.png';
-import peashooterNEWalk1Src from '../assets/Peashooter/Sprites/peashooter_northeast_1.png';
-import peashooterNEWalk2Src from '../assets/Peashooter/Sprites/peashooter_northeast_2.png';
-import peashooterNEShoot1Src from '../assets/Peashooter/Sprites/peashooter_northeast_shoot_1.png';
-import peashooterNEShoot2Src from '../assets/Peashooter/Sprites/peashooter_northeast_shoot_2.png';
-
-// Side / Right Sprites
-import peashooterRightIdleSrc from '../assets/Peashooter/Sprites/peashooter_right.png';
-import peashooterRightWalk1Src from '../assets/Peashooter/Sprites/peashooter_right_1.png';
-import peashooterRightWalk2Src from '../assets/Peashooter/Sprites/peashooter_right_2.png';
-import peashooterRightShoot1Src from '../assets/Peashooter/Sprites/peashooter_right_shoot_1.png';
-import peashooterRightShoot2Src from '../assets/Peashooter/Sprites/peashooter_right_shoot_2.png';
-
-// Down / Southeast Sprites
-import peashooterSEIdleSrc from '../assets/Peashooter/Sprites/peashooter_southeast.png';
-import peashooterSEWalk1Src from '../assets/Peashooter/Sprites/peashooter_southeast_1.png';
-import peashooterSEWalk2Src from '../assets/Peashooter/Sprites/peashooter_southeast_2.png';
-import peashooterSEShoot1Src from '../assets/Peashooter/Sprites/peashooter_southeast_shoot_1.png';
-import peashooterSEShoot2Src from '../assets/Peashooter/Sprites/peashooter_southeast_shoot_2.png';
-
-// Down Sprites
-import peashooterDownIdleSrc from '../assets/Peashooter/Sprites/peashooter_down.png';
-import peashooterDownWalk1Src from '../assets/Peashooter/Sprites/peashooter_down_1.png';
-import peashooterDownWalk2Src from '../assets/Peashooter/Sprites/peashooter_down_2.png';
-import peashooterDownShoot1Src from '../assets/Peashooter/Sprites/peashooter_down_shoot_1.png';
-import peashooterDownShoot2Src from '../assets/Peashooter/Sprites/peashooter_down_shoot_2.png';
-import peashooterDownBlinkSrc from '../assets/Peashooter/Sprites/peashooter_down_blink.png';
-
-import peashooterNEBlinkSrc from '../assets/Peashooter/Sprites/peashooter_northeast_blink.png';
-import peashooterRightBlinkSrc from '../assets/Peashooter/Sprites/peashooter_right_blink.png';
-import peashooterSEBlinkSrc from '../assets/Peashooter/Sprites/peashooter_southeast_blink.png';
-
 // Pea Gatling ability — "up" view (other non-diagonal facings fall back to it).
 // pea_gatling_up_1.png is a duplicate of pea_gatling_up.png, so it's
 // intentionally not imported/used here.
@@ -577,22 +537,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
         peashooterSpritesRef.current = {
             head: buildLayeredBodyPart('head'),
             lowerBody: buildLayeredBodyPart('lowerbody'),
-            up: loadImages([peashooterIdleSrc, peashooterWalk1Src, peashooterWalk2Src]),
-            diagonal: loadImages([peashooterNEIdleSrc, peashooterNEWalk1Src, peashooterNEWalk2Src]),
-            side: loadImages([peashooterRightIdleSrc, peashooterRightWalk1Src, peashooterRightWalk2Src]),
-            diagonalDown: loadImages([peashooterSEIdleSrc, peashooterSEWalk1Src, peashooterSEWalk2Src]),
-            down: loadImages([peashooterDownIdleSrc, peashooterDownWalk1Src, peashooterDownWalk2Src]),
-
-            upShoot: loadImages([peashooterUpShoot1Src, peashooterUpShoot2Src]),
-            diagonalShoot: loadImages([peashooterNEShoot1Src, peashooterNEShoot2Src]),
-            sideShoot: loadImages([peashooterRightShoot1Src, peashooterRightShoot2Src]),
-            diagonalDownShoot: loadImages([peashooterSEShoot1Src, peashooterSEShoot2Src]),
-            downShoot: loadImages([peashooterDownShoot1Src, peashooterDownShoot2Src]),
-
-            diagonalBlink: loadImages([peashooterNEBlinkSrc]),
-            sideBlink: loadImages([peashooterRightBlinkSrc]),
-            diagonalDownBlink: loadImages([peashooterSEBlinkSrc]),
-            downBlink: loadImages([peashooterDownBlinkSrc]),
 
             // pea_gatling_up_1.png deliberately omitted — duplicate of pea_gatling_up.png.
             gatlingActivationUp: loadImages([
