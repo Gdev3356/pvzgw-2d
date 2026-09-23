@@ -399,7 +399,7 @@ const layeredSpriteModules = import.meta.glob<{ default: string }>(
     '../assets/Peashooter/Sprites/peashooter_*_*_*.png',
     { eager: true }
 );
-const LAYERED_FILENAME_RE = /peashooter_([a-z]+)_(head|lowerbody)_([a-z]+)(?:_(\d+))?\.png$/;
+const LAYERED_FILENAME_RE = /peashooter_([a-z]+)_(head|lowerbody|upperbody)_([a-z]+)(?:_(\d+))?\.png$/;
 
 export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUpdate }) => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -508,7 +508,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
         // for 'lowerbody'). frameIndex defaults to 0 for the base file with
         // no numeric suffix (e.g. peashooter_down_head_idle.png has no
         // trailing _N, sorts first ahead of _1, _2, etc).
-        const buildLayeredBodyPart = (bodypart: 'head' | 'lowerbody'): LayeredBodyPart => {
+        const buildLayeredBodyPart = (bodypart: 'head' | 'lowerbody' | 'upperbody'): LayeredBodyPart => {
             const buckets: Record<string, Record<string, { frameIndex: number; url: string }[]>> = {};
 
             for (const [path, mod] of Object.entries(layeredSpriteModules)) {
@@ -537,6 +537,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
         peashooterSpritesRef.current = {
             head: buildLayeredBodyPart('head'),
             lowerBody: buildLayeredBodyPart('lowerbody'),
+            upperBody: buildLayeredBodyPart('upperbody'),
 
             // pea_gatling_up_1.png deliberately omitted — duplicate of pea_gatling_up.png.
             gatlingActivationUp: loadImages([
@@ -1047,7 +1048,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
                     // here directly, but applyRemotePuppetState immediately overwrote
                     // it with a Date.now()-based value, silently reintroducing a
                     // clock mismatch. Single source of truth now.
-                    puppet.applyRemotePuppetState(ix, iy, iz, iangle, netPlayer.vz, netPlayer.isMoving, netPlayer.isShooting, netPlayer.isHyperActive, netPlayer.activeBuffs.hyperRemaining, dt60, time);
+                    puppet.applyRemotePuppetState(ix, iy, iz, iangle, netPlayer.vz, netPlayer.isMoving, netPlayer.isShooting, netPlayer.isReloading, netPlayer.isHyperActive, netPlayer.activeBuffs.hyperRemaining, dt60, time);
 
                     // Just transitioned false -> true: a remote player pulled the trigger.
                     // Mirrors the local-player muzzle-flash spawn that's driven off the

@@ -172,7 +172,7 @@ export interface ExplosionEffect {
     impactStructureId?: string;
 }
 
-export type LayeredAnimState = 'idle' | 'walking' | 'firing' | 'blink' | 'jumping' | 'falling' | 'landing';
+export type LayeredAnimState = 'idle' | 'walking' | 'firing' | 'blink' | 'jumping' | 'falling' | 'landing' | 'reloading';
 // Same 5-bucket grouping the single-sprite system already uses (NE/NW share
 // one set, E/W share one set, SE/SW share one set) — just named to match
 // the new asset filenames directly instead of the old "diagonal"/"side"/
@@ -241,6 +241,10 @@ export interface CharacterSprites {
     // it, and it'd just be extra art for zero visual benefit.
     head?: LayeredBodyPart;
     lowerBody?: LayeredBodyPart;
+    // Optional on purpose — Foot Soldier and any future class without this
+    // art simply never draws a third layer; drawLayer() already no-ops on
+    // a null sprite, so nothing needs to gate on this being present.
+    upperBody?: LayeredBodyPart;
 }
 
 // A sound the simulation wants played, reported rather than played directly —

@@ -380,6 +380,18 @@ export class Player {
     // popping to nothing or silently reverting to idle.
     lastHeadSprite: HTMLImageElement | null = null;
     lastLowerBodySprite: HTMLImageElement | null = null;
+    lastUpperBodySprite: HTMLImageElement | null = null;
+    // 0 to 1, how far through the actual reload duration we are — drives
+    // the ping-pong (forward through all reload frames, then back) so the
+    // animation always lands exactly on frame 0 as the reload completes,
+    // regardless of weapon.reloadDuration or frame count. Computed once per
+    // logical update (local update() or the puppet-sync path below), read
+    // by draw(). wasReloadingLastTick exists only so puppets — which have
+    // no reloadStartTime of their own from the network — can detect the
+    // false->true edge and approximate one locally; the local player's own
+    // reloadStartTime is already set correctly by startReload().
+    reloadAnimProgress: number = 0;
+    wasReloadingLastTick: boolean = false;
 
     private queueSound(key: string, volume?: number, pitchVariation?: number): void {
         this.pendingSoundEvents.push({ key, volume, pitchVariation });
@@ -443,6 +455,9 @@ export class Player {
         this.landingTimer = 0;
         this.lastHeadSprite = null;
         this.lastLowerBodySprite = null;
+        this.lastUpperBodySprite = null;
+        this.reloadAnimProgress = 0;
+        this.wasReloadingLastTick = false;
         this.lastJumpTime = 0;
         this.cooldowns = { Q: 0, E: 0, F: 0 };
         this.activeBuffs = { hyper: 0 };
@@ -510,6 +525,7 @@ export class Player {
         x: number, y: number, z: number, angle: number,
         vz: number,
         isMoving: boolean, isShootingNow: boolean,
+        isReloading: boolean,
         isHyperActive: boolean,
         hyperRemaining: number,
         dt60: number,
@@ -521,6 +537,7 @@ export class Player {
         this.vz = vz;
         this.angle = angle;
         this.isMoving = isMoving;
+        this.isReloading = isReloading;
 
         this.wasHyperActive = isHyperActive;
 
@@ -576,6 +593,8 @@ export class Player {
                 this.nextBlinkThreshold = 150 + Math.random() * 240;
             }
         }
+
+        this.updateReloadAnimProgress(now);
     }
 
     canShoot(): boolean {
@@ -964,6 +983,7 @@ export class Player {
         this.angle = overrideAngle !== undefined ? overrideAngle : getAngle(this.x, this.y, mousePos.x, mousePos.y);
 
         this.updateAirborneAnimState(dt60);
+        this.updateReloadAnimProgress(currentTime);
     }
 
     // Drives airborneAnimState off the same z/vz/groundZ physics both local
@@ -1004,6 +1024,18 @@ export class Player {
             }
             this.wasAirborneLastTick = false;
         }
+    }
+
+    // See the field comments above for why wasReloadingLastTick exists.
+    updateReloadAnimProgress(currentTime: number): void {
+        if (this.isReloading) {
+            if (!this.wasReloadingLastTick) this.reloadStartTime = currentTime;
+            const duration = this.config.weapon.reloadDuration || 1;
+            this.reloadAnimProgress = Math.min(1, (currentTime - this.reloadStartTime) / duration);
+        } else {
+            this.reloadAnimProgress = 0;
+        }
+        this.wasReloadingLastTick = this.isReloading;
     }
 
     draw(ctx: CanvasRenderingContext2D, sprites?: CharacterSprites | HTMLImageElement[] | null): void {
@@ -1091,6 +1123,21 @@ export class Player {
             };
             const bodyState = resolveLayerState(true);
             const headState = resolveLayerState(false);
+            // Not folded into resolveLayerState above — reload is genuinely
+            // its own priority shape, not a variant of either existing one.
+            // Takes precedence over airborne (you can reload mid-jump) and
+            // over firing (moot in practice — canShoot() already returns
+            // false while isReloading, so the two states can't really
+            // co-occur, but reloading wins if they ever did).
+            const upperBodyState: LayeredAnimState = this.isReloading
+                ? 'reloading'
+                : this.airborneAnimState
+                    ? this.airborneAnimState
+                    : this.isShooting
+                        ? 'firing'
+                        : this.isMoving
+                            ? 'walking'
+                            : 'idle';
 
             const pickLayerFrame = (
                 part: LayeredBodyPart | undefined,
@@ -1158,6 +1205,19 @@ export class Player {
                         const loopIdx = 1 + (Math.floor(loopTimer / ticksPerFrame) % 2);
                         return frames[Math.min(frames.length - 1, loopIdx)];
                     }
+                    case 'reloading': {
+                        // Ping-pong across the whole frame set, timed to the
+                        // real reload duration (reloadAnimProgress, 0 to 1)
+                        // rather than a fixed tick cadence like the other
+                        // cases — first half of the reload plays forward,
+                        // second half plays back in reverse, landing exactly
+                        // on frame 0 as the reload finishes regardless of
+                        // weapon.reloadDuration or how many frames exist.
+                        const p = this.reloadAnimProgress;
+                        const sweep = p < 0.5 ? p * 2 : (1 - p) * 2;
+                        const idx = Math.min(frames.length - 1, Math.floor(sweep * frames.length));
+                        return frames[idx];
+                    }
                     case 'landing':
                     case 'idle':
                     default:
@@ -1166,8 +1226,10 @@ export class Player {
             };
 
             const bodySprite = pickLayerFrame(layeredSprites!.lowerBody, bodyState, this.lastLowerBodySprite);
+            const upperSprite = pickLayerFrame(layeredSprites!.upperBody, upperBodyState, this.lastUpperBodySprite);
             const headSprite = pickLayerFrame(layeredSprites!.head, headState, this.lastHeadSprite);
             this.lastLowerBodySprite = bodySprite;
+            this.lastUpperBodySprite = upperSprite;
             this.lastHeadSprite = headSprite;
 
             // Same renderSize/mirror math the single-sprite path already
@@ -1188,6 +1250,7 @@ export class Player {
             // Body first (behind), head second (in front) — standard
             // character layering.
             drawLayer(bodySprite);
+            drawLayer(upperSprite);
             drawLayer(headSprite);
         } else {
 
@@ -1443,6 +1506,8 @@ export class Player {
             this.jumpAnimTimer = 0;
             this.fallAnimTimer = 0;
             this.landingTimer = 0;
+            this.reloadAnimProgress = 0;
+            this.wasReloadingLastTick = false;
         }
     }
 }
