@@ -1209,12 +1209,22 @@ export class Player {
                         // Ping-pong across the whole frame set, timed to the
                         // real reload duration (reloadAnimProgress, 0 to 1)
                         // rather than a fixed tick cadence like the other
-                        // cases — first half of the reload plays forward,
+                        // cases — first half of the sweep plays forward,
                         // second half plays back in reverse, landing exactly
                         // on frame 0 as the reload finishes regardless of
                         // weapon.reloadDuration or how many frames exist.
+                        //
+                        // RELOAD_ANIM_DELAY holds on frame 0 for the first
+                        // fraction of the reload (a "wind-up" pause) before
+                        // the sweep starts, then compresses the whole sweep
+                        // into the remaining time — makes the visible motion
+                        // read snappier without changing the total time
+                        // actually spent reloading at all.
+                        const RELOAD_ANIM_DELAY = 0.25;
                         const p = this.reloadAnimProgress;
-                        const sweep = p < 0.5 ? p * 2 : (1 - p) * 2;
+                        if (p < RELOAD_ANIM_DELAY) return frames[0];
+                        const animProgress = (p - RELOAD_ANIM_DELAY) / (1 - RELOAD_ANIM_DELAY);
+                        const sweep = animProgress < 0.5 ? animProgress * 2 : (1 - animProgress) * 2;
                         const idx = Math.min(frames.length - 1, Math.floor(sweep * frames.length));
                         return frames[idx];
                     }
