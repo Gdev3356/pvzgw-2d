@@ -1220,7 +1220,7 @@ export class Player {
                         // into the remaining time — makes the visible motion
                         // read snappier without changing the total time
                         // actually spent reloading at all.
-                        const RELOAD_ANIM_DELAY = 0.25;
+                        const RELOAD_ANIM_DELAY = 0.15;
                         const p = this.reloadAnimProgress;
                         if (p < RELOAD_ANIM_DELAY) return frames[0];
                         const animProgress = (p - RELOAD_ANIM_DELAY) / (1 - RELOAD_ANIM_DELAY);
