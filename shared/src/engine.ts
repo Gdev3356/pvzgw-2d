@@ -393,6 +393,16 @@ export class Player {
     reloadAnimProgress: number = 0;
     wasReloadingLastTick: boolean = false;
 
+    // --- Death-state rendering ---
+    // Captured once, at the exact moment isDead flips true (takeDamage(),
+    // or the justDied edge in applyRemotePuppetState for puppets) — NOT
+    // recomputed every frame, so a death is a single fixed pose, not
+    // something that could flicker or drift.
+    deathAngle: number = 0;          // frozen facing — draw() uses this instead of this.angle whenever isDead
+    deadPoseIndex: number = 0;       // which of the upperBody dead variants (only layer with more than one)
+    diedWhileGatling: boolean = false; // whether to draw the gatling-specific dead overlay on top
+    deathTransitionTimer: number = 0;  // ticks since death — drives the squash-stretch settle in draw()
+
     private queueSound(key: string, volume?: number, pitchVariation?: number): void {
         this.pendingSoundEvents.push({ key, volume, pitchVariation });
     }
@@ -526,6 +536,7 @@ export class Player {
         vz: number,
         isMoving: boolean, isShootingNow: boolean,
         isReloading: boolean,
+        isDeadNow: boolean,
         isHyperActive: boolean,
         hyperRemaining: number,
         dt60: number,
@@ -535,6 +546,25 @@ export class Player {
         this.y = y;
         this.z = z;
         this.vz = vz;
+
+        const justDied = isDeadNow && !this.isDead;
+        this.isDead = isDeadNow;
+
+        if (this.isDead) {
+            if (justDied) {
+                this.deathAngle = angle;
+                this.diedWhileGatling = this.isGatlingMode;
+                this.deadPoseIndex = Math.floor(Math.random() * 3);
+                this.deathTransitionTimer = 0;
+            } else {
+                this.deathTransitionTimer += dt60;
+            }
+            // angle/isMoving/isShooting/isReloading deliberately NOT
+            // touched below — frozen at whatever they were the instant
+            // death was detected, same reasoning as the update() guard.
+            return;
+        }
+
         this.angle = angle;
         this.isMoving = isMoving;
         this.isReloading = isReloading;
@@ -781,6 +811,19 @@ export class Player {
         // not just dummies.
         aimAssistTargets: AimTarget[] = []
     ): void {
+        if (this.isDead) {
+            // Skips everything below — angle, movement, shooting, blink —
+            // which is exactly what freezes the character facing whatever
+            // direction it was looking when it died, and stops mouse
+            // clicks/movement from producing any visual reaction. Server
+            // already never calls update() at all for a dead player (see
+            // room.ts's tick loop); this guard is what makes the same true
+            // for client-side prediction of the local player, which isn't
+            // gated externally the same way.
+            this.deathTransitionTimer += dt60;
+            return;
+        }
+
         if (this.shootTimer > 0) {
             this.shootTimer -= dt60;
             if (this.shootTimer <= 0) {
@@ -1079,17 +1122,21 @@ export class Player {
 
         ctx.scale(scale, scale);
 
-        const dirInfo = get8WayDirection(this.angle);
+        const dirInfo = get8WayDirection(this.isDead ? this.deathAngle : this.angle);
 
         const layeredSprites = sprites && !Array.isArray(sprites) ? (sprites as CharacterSprites) : null;
         const hasLayeredArt = Boolean(layeredSprites?.head && layeredSprites?.lowerBody);
 
-        if (!this.isGatlingMode && !this.isGatlingDeactivating && hasLayeredArt) {
-            // === Head/lowerBody split — regular movement only ===
+        if ((this.isDead || (!this.isGatlingMode && !this.isGatlingDeactivating)) && hasLayeredArt) {
+            // === Head/lowerBody split — regular movement only, PLUS dead
+            // (dead overrides the gatling exclusion below — a death while
+            // gatling still needs the layered dead pose + its overlay, not
+            // the old gatling-alive single-sprite rendering) ===
             // Pea Gatling always falls to the else branch below (existing
-            // single-sprite system, unchanged), same as any character/state
-            // that doesn't have layered art yet (e.g. Foot Soldier, until it
-            // gets its own head/lowerBody set).
+            // single-sprite system, unchanged) while actually alive and
+            // gatling, same as any character/state that doesn't have
+            // layered art yet (e.g. Foot Soldier, until it gets its own
+            // head/lowerBody set).
             const toLayeredDirection = (dir: string): LayeredDirection => {
                 switch (dir) {
                     case 'E': case 'W': return 'right';
@@ -1109,6 +1156,7 @@ export class Player {
             // independent of leg movement, so you can see a firing head
             // while jumping/falling, not just while grounded.
             const resolveLayerState = (preferMovement: boolean): LayeredAnimState => {
+                if (this.isDead) return 'dead';
                 if (preferMovement) {
                     if (this.airborneAnimState) return this.airborneAnimState;
                     if (this.isMoving) return 'walking';
@@ -1129,15 +1177,17 @@ export class Player {
             // over firing (moot in practice — canShoot() already returns
             // false while isReloading, so the two states can't really
             // co-occur, but reloading wins if they ever did).
-            const upperBodyState: LayeredAnimState = this.isReloading
-                ? 'reloading'
-                : this.airborneAnimState
-                    ? this.airborneAnimState
-                    : this.isShooting
-                        ? 'firing'
-                        : this.isMoving
-                            ? 'walking'
-                            : 'idle';
+            const upperBodyState: LayeredAnimState = this.isDead
+                ? 'dead'
+                : this.isReloading
+                    ? 'reloading'
+                    : this.airborneAnimState
+                        ? this.airborneAnimState
+                        : this.isShooting
+                            ? 'firing'
+                            : this.isMoving
+                                ? 'walking'
+                                : 'idle';
 
             const pickLayerFrame = (
                 part: LayeredBodyPart | undefined,
@@ -1220,7 +1270,7 @@ export class Player {
                         // into the remaining time — makes the visible motion
                         // read snappier without changing the total time
                         // actually spent reloading at all.
-                        const RELOAD_ANIM_DELAY = 0.15;
+                        const RELOAD_ANIM_DELAY = 0.25;
                         const p = this.reloadAnimProgress;
                         if (p < RELOAD_ANIM_DELAY) return frames[0];
                         const animProgress = (p - RELOAD_ANIM_DELAY) / (1 - RELOAD_ANIM_DELAY);
@@ -1228,6 +1278,13 @@ export class Player {
                         const idx = Math.min(frames.length - 1, Math.floor(sweep * frames.length));
                         return frames[idx];
                     }
+                    case 'dead':
+                        // Static — no animation, deliberately. Modulo rather
+                        // than a direct index so this works correctly for
+                        // both the single-frame layers (head/lowerBody) and
+                        // upperBody's three variants without needing to know
+                        // which layer this is.
+                        return frames[this.deadPoseIndex % frames.length];
                     case 'landing':
                     case 'idle':
                     default:
@@ -1259,9 +1316,31 @@ export class Player {
             };
             // Body first (behind), head second (in front) — standard
             // character layering.
+            const DEATH_TRANSITION_DURATION = 16; // ticks — tune by eye
+            let deathScaleApplied = false;
+            if (this.isDead && this.deathTransitionTimer < DEATH_TRANSITION_DURATION) {
+                // Squash-stretch settle: squashed (wide/flat) at the instant
+                // of death, swings through a stretch, decays to normal (1,1)
+                // by the end — classic "impact" game-feel technique. Wraps
+                // all layers together (including the gatling overlay below)
+                // so they move as one piece rather than looking disjointed.
+                const t = this.deathTransitionTimer / DEATH_TRANSITION_DURATION;
+                const wobble = Math.cos(t * Math.PI * 2.5) * (1 - t) * 0.3;
+                ctx.save();
+                ctx.scale(1 + wobble, 1 - wobble);
+                deathScaleApplied = true;
+            }
             drawLayer(bodySprite);
             drawLayer(upperSprite);
             drawLayer(headSprite);
+            // Gatling-death overlay — static, no animation (intentional,
+            // per spec). Sits on top of the head, same position/scale math
+            // as every other layer; only drawn if this death happened while
+            // gatling was active.
+            if (this.isDead && this.diedWhileGatling) {
+                drawLayer(layeredSprites!.gatlingDeadOverlay?.[dirKey] ?? null);
+            }
+            if (deathScaleApplied) ctx.restore();
         } else {
 
         let upSprites: HTMLImageElement[] | null = null;
@@ -1496,6 +1575,13 @@ export class Player {
             this.health = 0;
             this.isDead = true;
             this.respawnTimer = Date.now();
+            this.deathAngle = this.angle;
+            this.diedWhileGatling = this.isGatlingMode;
+            // Only upperBody actually has more than one dead variant (3);
+            // frame-picking takes this modulo the real frames.length at
+            // render time, so this doesn't need to track that count exactly.
+            this.deadPoseIndex = Math.floor(Math.random() * 3);
+            this.deathTransitionTimer = 0;
             return true;
         }
         return false;

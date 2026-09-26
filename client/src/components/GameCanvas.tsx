@@ -102,6 +102,17 @@ import peaGatlingDown3Src from '../assets/Peashooter/Sprites/Abilities/PeaGatlin
 import peaGatlingDown4Src from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_down_4.png';
 import peaGatlingDownFiringSrc from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_down_firing.png';
 
+// Gatling-death overlay — static, no animation, drawn on top of the dead
+// head/upperBody/lowerBody pose only when the player died while gatling
+// was active. Lives in the same PeaGatling ability folder as everything
+// else gatling-related, not the flat Sprites/ folder the layered glob
+// loader looks in.
+import peaGatlingDeadUpSrc from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_up_dead.png';
+import peaGatlingDeadDownSrc from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_down_dead.png';
+import peaGatlingDeadNESrc from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_northeast_dead.png';
+import peaGatlingDeadRightSrc from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_right_dead.png';
+import peaGatlingDeadSESrc from '../assets/Peashooter/Sprites/Abilities/PeaGatling/pea_gatling_southeast_dead.png';
+
 import peaSpriteSrc from '../assets/Peashooter/Sprites/pea.png';
 import peaFired1Src from '../assets/Peashooter/Sprites/pea_fired_1.png';
 import peaFired2Src from '../assets/Peashooter/Sprites/pea_fired_2.png';
@@ -538,6 +549,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
             head: buildLayeredBodyPart('head'),
             lowerBody: buildLayeredBodyPart('lowerbody'),
             upperBody: buildLayeredBodyPart('upperbody'),
+            gatlingDeadOverlay: {
+                up: loadImages([peaGatlingDeadUpSrc])[0],
+                down: loadImages([peaGatlingDeadDownSrc])[0],
+                northeast: loadImages([peaGatlingDeadNESrc])[0],
+                right: loadImages([peaGatlingDeadRightSrc])[0],
+                southeast: loadImages([peaGatlingDeadSESrc])[0],
+            },
 
             // pea_gatling_up_1.png deliberately omitted — duplicate of pea_gatling_up.png.
             gatlingActivationUp: loadImages([
@@ -1048,7 +1066,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ selectedClass, onStatsUp
                     // here directly, but applyRemotePuppetState immediately overwrote
                     // it with a Date.now()-based value, silently reintroducing a
                     // clock mismatch. Single source of truth now.
-                    puppet.applyRemotePuppetState(ix, iy, iz, iangle, netPlayer.vz, netPlayer.isMoving, netPlayer.isShooting, netPlayer.isReloading, netPlayer.isHyperActive, netPlayer.activeBuffs.hyperRemaining, dt60, time);
+                    puppet.applyRemotePuppetState(ix, iy, iz, iangle, netPlayer.vz, netPlayer.isMoving, netPlayer.isShooting, netPlayer.isReloading, netPlayer.isDead, netPlayer.isHyperActive, netPlayer.activeBuffs.hyperRemaining, dt60, time);
 
                     // Just transitioned false -> true: a remote player pulled the trigger.
                     // Mirrors the local-player muzzle-flash spawn that's driven off the

@@ -172,7 +172,7 @@ export interface ExplosionEffect {
     impactStructureId?: string;
 }
 
-export type LayeredAnimState = 'idle' | 'walking' | 'firing' | 'blink' | 'jumping' | 'falling' | 'landing' | 'reloading';
+export type LayeredAnimState = 'idle' | 'walking' | 'firing' | 'blink' | 'jumping' | 'falling' | 'landing' | 'reloading' | 'dead';
 // Same 5-bucket grouping the single-sprite system already uses (NE/NW share
 // one set, E/W share one set, SE/SW share one set) — just named to match
 // the new asset filenames directly instead of the old "diagonal"/"side"/
@@ -181,6 +181,10 @@ export type LayeredDirection = 'up' | 'down' | 'northeast' | 'right' | 'southeas
 
 export type LayeredDirectionSprites = Partial<Record<LayeredAnimState, HTMLImageElement[]>>;
 export type LayeredBodyPart = Partial<Record<LayeredDirection, LayeredDirectionSprites>>;
+// Single static image per direction — no state dispatch needed since this
+// is only ever shown while isDead is already true, and it deliberately has
+// no animation.
+export type GatlingDeadOverlay = Partial<Record<LayeredDirection, HTMLImageElement>>;
 
 export interface CharacterSprites {
     up?: HTMLImageElement[];
@@ -245,6 +249,11 @@ export interface CharacterSprites {
     // art simply never draws a third layer; drawLayer() already no-ops on
     // a null sprite, so nothing needs to gate on this being present.
     upperBody?: LayeredBodyPart;
+    // 5-direction static overlay, drawn on top of the dead head/upperBody/
+    // lowerBody pose when the character died while gatling was active. No
+    // relation to the gatling* single-sprite fields above — those are for
+    // the alive gatling stance, this is death-only.
+    gatlingDeadOverlay?: GatlingDeadOverlay;
 }
 
 // A sound the simulation wants played, reported rather than played directly —
